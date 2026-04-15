@@ -12,10 +12,14 @@ const PORT = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
-// Logger Middleware simple
+// Logger Middleware Pro
 app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${req.method} ${req.url}`);
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+  });
   next();
 });
 
@@ -46,14 +50,6 @@ app.post('/api/projects', async (req, res) => {
   try {
     const project = await prisma.project.create({
       data: { name }
-    });
-    // Create some default sections as templates if requested
-    await prisma.section.createMany({
-      data: [
-        { projectId: project.id, name: 'Disjoncteurs 18mm', defaultWidth: 18, defaultHeight: 15, order: 0 },
-        { projectId: project.id, name: 'Fusibles', defaultWidth: 10, defaultHeight: 12, order: 1 },
-        { projectId: project.id, name: 'Signalétique', defaultWidth: 40, defaultHeight: 20, order: 2, bgColor: '#fef08a' }
-      ]
     });
     res.json(project);
   } catch (error) {
