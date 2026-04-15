@@ -7,6 +7,22 @@ import {
 } from 'lucide-react';
 
 function App() {
+  const [deviceId] = useState(() => {
+    let id = localStorage.getItem('cetelec_device_id');
+    if (!id) {
+      id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      localStorage.setItem('cetelec_device_id', id);
+    }
+    return id;
+  });
+
+  const apiFetch = (url, options = {}) => {
+    return fetch(url, { 
+      ...options, 
+      headers: { ...options.headers, 'X-User-Id': deviceId } 
+    });
+  };
+
   const [projects, setProjects] = useState([]);
   const [activeProject, setActiveProject] = useState(null);
   const [activeTab, setActiveTab] = useState('editor'); // 'editor' | 'config'
@@ -15,13 +31,13 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchProjects();
+    apiFetchProjects();
   }, []);
 
-  const fetchProjects = async () => {
+  const apiFetchProjects = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/projects');
+      const res = await apiFetch('/api/projects');
       if (res.ok) {
         const data = await res.json();
         setProjects(data || []);
@@ -39,7 +55,7 @@ function App() {
       return;
     }
     try {
-      const res = await fetch(`/api/projects/${id}`);
+      const res = await apiFetch(`/api/projects/${id}`);
       if (res.ok) {
         const data = await res.json();
         setActiveProject(data);
@@ -56,7 +72,7 @@ function App() {
     const name = prompt("Nom du nouveau projet :");
     if (!name) return;
     try {
-      const res = await fetch('/api/projects', {
+      const res = await apiFetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
@@ -75,7 +91,7 @@ function App() {
     const newName = prompt("Nouveau nom du projet :", currentName);
     if (!newName || newName === currentName) return;
     try {
-      const res = await fetch(`/api/projects/${id}`, {
+      const res = await apiFetch(`/api/projects/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName })
@@ -97,7 +113,7 @@ function App() {
     const name = prompt("Nom de la catégorie (ex: Disjoncteurs, Fusibles) :");
     if (!name) return;
     try {
-      const res = await fetch(`/api/projects/${activeProject.id}/sections`, {
+      const res = await apiFetch(`/api/projects/${activeProject.id}/sections`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -118,14 +134,14 @@ function App() {
   const deleteSection = async (id) => {
     if (!confirm("Supprimer cette catégorie et toutes ses étiquettes ?")) return;
     try {
-      await fetch(`/api/sections/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/sections/${id}`, { method: 'DELETE' });
       loadProject(activeProject.id);
     } catch (err) { console.error(err); }
   };
 
   const updateSection = async (id, updates) => {
     try {
-      const res = await fetch(`/api/sections/${id}`, {
+      const res = await apiFetch(`/api/sections/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
@@ -143,7 +159,7 @@ function App() {
   const addLabel = async (sectionId, text) => {
     if (!text) return;
     try {
-      const res = await fetch(`/api/sections/${sectionId}/labels`, {
+      const res = await apiFetch(`/api/sections/${sectionId}/labels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })
@@ -156,7 +172,7 @@ function App() {
 
   const deleteLabel = async (id) => {
     try {
-      await fetch(`/api/labels/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/labels/${id}`, { method: 'DELETE' });
       loadProject(activeProject.id);
     } catch (err) { console.error(err); }
   };

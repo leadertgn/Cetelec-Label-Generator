@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -30,8 +32,12 @@ app.get('/health', (req, res) => {
 
 // Projets
 app.get('/api/projects', async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) return res.json([]);
+  
   try {
     const projects = await prisma.project.findMany({
+      where: { userId },
       include: {
         _count: {
           select: { sections: true }
@@ -47,9 +53,19 @@ app.get('/api/projects', async (req, res) => {
 
 app.post('/api/projects', async (req, res) => {
   const { name } = req.body;
+  const userId = req.headers['x-user-id'];
+  if (!userId) return res.status(401).json({ error: "Missing X-User-Id" });
+  
   try {
+    // Ensure user exists
+    await prisma.user.upsert({
+      where: { id: userId },
+      update: {},
+      create: { id: userId }
+    });
+
     const project = await prisma.project.create({
-      data: { name }
+      data: { name, userId }
     });
     res.json(project);
   } catch (error) {
@@ -174,6 +190,17 @@ app.delete('/api/labels/:id', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Production - Servir le frontend compilé
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use(express.static(path.join(__dirname, '../../frontend/dist')));
+
+// Rediriger toutes les autres requêtes vers l'app React
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
 });
 
 app.listen(PORT, () => {
