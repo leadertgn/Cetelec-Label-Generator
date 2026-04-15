@@ -47,6 +47,7 @@ app.get('/api/projects', async (req, res) => {
     });
     res.json(projects);
   } catch (error) {
+    console.error("Erreur GET /api/projects:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
