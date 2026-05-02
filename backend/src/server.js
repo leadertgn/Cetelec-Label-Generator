@@ -11,6 +11,19 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5001;
 
+// Empêcher Render de s'endormir (Ping toutes les 14 min)
+const SELF_URL = process.env.SELF_URL;
+if (SELF_URL) {
+  setInterval(async () => {
+    try {
+      await fetch(`${SELF_URL}/health`);
+      console.log('Self-ping success: Staying awake!');
+    } catch (e) {
+      console.error('Self-ping error:', e.message);
+    }
+  }, 14 * 60 * 1000);
+}
+
 app.use(cors());
 app.use(express.json());
 
