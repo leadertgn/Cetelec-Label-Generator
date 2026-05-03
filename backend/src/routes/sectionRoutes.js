@@ -85,16 +85,34 @@ router.post('/:id/duplicate', async (req, res) => {
       }
     });
 
+    // Échapper les caractères spéciaux pour le Regex
+    const escapedBaseName = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
     let maxNum = 0;
     existingSections.forEach(sec => {
-      const match = sec.name.match(new RegExp(`^${baseName}_(\\d+)$`));
+      const match = sec.name.match(new RegExp(`^${escapedBaseName}_(\\d+)$`));
       if (match) {
         const num = parseInt(match[1]);
         if (num > maxNum) maxNum = num;
       }
     });
     
-    const newName = `${baseName}_${maxNum + 1}`;
+    let newName = `${baseName}_${maxNum + 1}`;
+
+    // Vérification de sécurité supplémentaire pour éviter les doublons
+    let isUnique = false;
+    let counter = maxNum + 1;
+    while (!isUnique) {
+      const collision = await prisma.section.findFirst({
+        where: { projectId: s.projectId, name: newName }
+      });
+      if (collision) {
+        counter++;
+        newName = `${baseName}_${counter}`;
+      } else {
+        isUnique = true;
+      }
+    }
 
     const newSection = await prisma.section.create({
       data: {
