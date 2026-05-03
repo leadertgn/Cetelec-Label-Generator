@@ -11,7 +11,7 @@ const Sidebar = ({
   selectedSectionId, setSelectedSectionId,
   onAddLabel, onBatch, onUpdateLabel, onDeleteLabel,
   onUpdateSection, onDuplicateSection, onDeleteSection, onCreateSection,
-  unit, setUnit, showCuttingMarks, setShowCuttingMarks, onLogoUpload
+  unit, setUnit, onLogoUpload
 }) => {
   return (
     <aside className="sidebar no-print">
@@ -81,10 +81,6 @@ const Sidebar = ({
                 <option value="cm">Centimètres (cm)</option>
               </select>
             </div>
-            <label style={{display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.875rem', cursor: 'pointer'}}>
-              <input type="checkbox" checked={showCuttingMarks} onChange={(e) => setShowCuttingMarks(e.target.checked)} />
-              Marques de découpe
-            </label>
           </div>
 
           <div style={{marginTop: '1.5rem'}}>

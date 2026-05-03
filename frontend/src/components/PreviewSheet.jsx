@@ -1,6 +1,6 @@
 import React from 'react';
 
-const PreviewSheet = ({ pages, project, logoBase64, showCuttingMarks }) => (
+const PreviewSheet = ({ pages, project, logoBase64 }) => (
   <section className="canvas">
     {pages.map((page, pIdx) => (
       <div key={pIdx} className="sheet">
@@ -65,7 +65,7 @@ const PreviewSheet = ({ pages, project, logoBase64, showCuttingMarks }) => (
                    */
                   <div
                     key={l.id}
-                    className={`label-wrapper ${showCuttingMarks ? 'cutting-marks' : ''}`}
+                    className="label-wrapper"
                     style={{
                       width: `${sec.defaultWidth}mm`,
                       height: `${sec.defaultHeight}mm`,

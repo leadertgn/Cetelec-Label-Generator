@@ -29,7 +29,6 @@ function App() {
   const [activeTab, setActiveTab] = useState('editor');
   const [selectedSectionId, setSelectedSectionId] = useState(null);
   const [logoBase64, setLogoBase64] = useState(null);
-  const [showCuttingMarks, setShowCuttingMarks] = useState(false);
   const [unit, setUnit] = useState('mm');
 
   // Modal state
@@ -44,6 +43,15 @@ function App() {
       : 'CETELEC LabelGen';
   }, [activeProject]);
 
+  // Sync project ID with URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const idFromUrl = params.get('projectId');
+    if (idFromUrl && projects.length > 0 && !activeProject) {
+      handleLoadProject(idFromUrl);
+    }
+  }, [projects, activeProject]);
+
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
   const handleLoadProject = async (id) => {
@@ -51,6 +59,10 @@ function App() {
     if (data) {
       if (data.sections?.length > 0) setSelectedSectionId(data.sections[0].id);
       setView('editor');
+      // Update URL
+      const url = new URL(window.location);
+      url.searchParams.set('projectId', id);
+      window.history.pushState({}, '', url);
     }
   };
 
@@ -215,7 +227,12 @@ function App() {
 
   return (
     <div className="app-container">
-      <Header onHome={() => setView('dashboard')} project={activeProject} view={view} />
+      <Header onHome={() => {
+        setView('dashboard');
+        const url = new URL(window.location);
+        url.searchParams.delete('projectId');
+        window.history.pushState({}, '', url);
+      }} project={activeProject} view={view} />
 
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {view === 'dashboard' ? (
@@ -256,7 +273,6 @@ function App() {
               }}
               onCreateSection={() => { setModalType('createSection'); setModalData({ name: '' }); }}
               unit={unit} setUnit={setUnit}
-              showCuttingMarks={showCuttingMarks} setShowCuttingMarks={setShowCuttingMarks}
               onLogoUpload={(e) => {
                 const file = e.target.files[0];
                 if (file) {
@@ -271,7 +287,6 @@ function App() {
               pages={pages}
               project={activeProject}
               logoBase64={logoBase64}
-              showCuttingMarks={showCuttingMarks}
             />
           </div>
         )}
