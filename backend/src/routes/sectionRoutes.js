@@ -24,6 +24,7 @@ router.post('/projects/:projectId/sections', async (req, res) => {
         order: order || 0
       }
     });
+    console.log(`[Section] Création : "${section.name}"`);
     res.json(section);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -36,21 +37,14 @@ router.patch('/:id', async (req, res) => {
   try {
     const section = await prisma.section.update({
       where: { id: req.params.id },
-      data: {
-        name,
-        defaultWidth: defaultWidth !== undefined ? parseFloat(defaultWidth) : undefined,
-        defaultHeight: defaultHeight !== undefined ? parseFloat(defaultHeight) : undefined,
-        bgColor,
-        textColor,
-        borderSize: borderSize !== undefined ? parseFloat(borderSize) : undefined,
-        borderColor,
-        borderRadius: borderRadius !== undefined ? parseFloat(borderRadius) : undefined,
-        spacing: spacing !== undefined ? parseFloat(spacing) : undefined,
-        fontSize: fontSize !== undefined ? parseFloat(fontSize) : undefined,
-        fontFamily,
-        order: order !== undefined ? parseInt(order) : undefined
+      data: { 
+        name, defaultWidth: defaultWidth !== undefined ? parseFloat(defaultWidth) : undefined, defaultHeight: defaultHeight !== undefined ? parseFloat(defaultHeight) : undefined,
+        bgColor, textColor, borderSize: borderSize !== undefined ? parseFloat(borderSize) : undefined, borderColor,
+        borderRadius: borderRadius !== undefined ? parseFloat(borderRadius) : undefined, spacing: spacing !== undefined ? parseFloat(spacing) : undefined,
+        fontSize: fontSize !== undefined ? parseFloat(fontSize) : undefined, fontFamily, order: order !== undefined ? parseInt(order) : undefined
       }
     });
+    console.log(`[Section] Mise à jour : "${section.name}"`);
     res.json(section);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -60,7 +54,8 @@ router.patch('/:id', async (req, res) => {
 // Supprimer une section
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.section.delete({ where: { id: req.params.id } });
+    const section = await prisma.section.delete({ where: { id: req.params.id } });
+    console.log(`[Section] Suppression : "${section.name}"`);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -138,7 +133,7 @@ router.post('/:id/duplicate', async (req, res) => {
       },
       include: { labels: true }
     });
-
+    console.log(`[Section] Duplication : "${s.name}" -> "${newName}"`);
     res.json(newSection);
   } catch (error) {
     res.status(500).json({ error: error.message });

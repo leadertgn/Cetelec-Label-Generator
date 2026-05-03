@@ -36,6 +36,7 @@ router.get('/:id', async (req, res) => {
         }
       }
     });
+    if (project) console.log(`[Project] Chargement : "${project.name}"`);
     res.json(project);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -58,6 +59,7 @@ router.post('/', async (req, res) => {
     const project = await prisma.project.create({
       data: { name, userId }
     });
+    console.log(`[Project] Création : "${project.name}"`);
     res.json(project);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -84,6 +86,7 @@ router.patch('/:id', async (req, res) => {
         showSectionTitles
       }
     });
+    console.log(`[Project] Mise à jour : "${project.name}"`);
     res.json(project);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -93,9 +96,10 @@ router.patch('/:id', async (req, res) => {
 // Supprimer un projet (CRUD COMPLET)
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.project.delete({
+    const project = await prisma.project.delete({
       where: { id: req.params.id }
     });
+    console.log(`[Project] Suppression : "${project.name}"`);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });

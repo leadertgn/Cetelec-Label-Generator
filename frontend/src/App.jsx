@@ -67,10 +67,21 @@ function App() {
       // Vérifier si un brouillon local existe pour ce projet
       const savedDraft = localStorage.getItem(`cetelec_draft_${id}`);
       if (savedDraft) {
-        const draft = JSON.parse(savedDraft);
-        // On ne restaure que si le brouillon est plus récent ou différent (simplifié ici par un confirm)
-        if (confirm("Une version non sauvegardée de ce projet a été trouvée. Voulez-vous la restaurer ?")) {
-          setActiveProject(draft);
+        try {
+          const draft = JSON.parse(savedDraft);
+          // Comparaison profonde simplifiée pour détecter de vrais changements
+          const isDifferent = JSON.stringify(draft) !== JSON.stringify(data);
+          
+          if (isDifferent) {
+            if (confirm("Une version non sauvegardée de ce projet a été trouvée. Voulez-vous la restaurer ?")) {
+              setActiveProject(draft);
+            }
+          } else {
+            // Si le brouillon est identique au serveur, on le supprime pour ne plus avoir le prompt
+            localStorage.removeItem(`cetelec_draft_${id}`);
+          }
+        } catch (e) {
+          localStorage.removeItem(`cetelec_draft_${id}`);
         }
       }
       
