@@ -7,6 +7,8 @@
   --text-main: #0f172a;
   --text-muted: #64748b;
   --danger: #ef4444;
+  --a4-width: 210mm;
+  --a4-height: 297mm;
 }
 
 * {
@@ -27,7 +29,7 @@ body {
   height: 100vh;
 }
 
-/* Header */
+/* ── Header ──────────────────────────────────────── */
 .header {
   height: 64px;
   background: white;
@@ -46,7 +48,7 @@ body {
   letter-spacing: -0.025em;
 }
 
-/* Dashboard */
+/* ── Dashboard ───────────────────────────────────── */
 .dashboard {
   padding: 2rem;
   max-width: 1000px;
@@ -77,15 +79,10 @@ body {
   transition: background 0.2s;
 }
 
-.project-item:last-child {
-  border-bottom: none;
-}
+.project-item:last-child { border-bottom: none; }
+.project-item:hover { background: #f8fafc; }
 
-.project-item:hover {
-  background: #f8fafc;
-}
-
-/* Editor Layout */
+/* ── Editor Layout ───────────────────────────────── */
 .editor-layout {
   display: flex;
   flex: 1;
@@ -112,7 +109,7 @@ body {
   align-items: center;
 }
 
-/* UI Components */
+/* ── UI Components ───────────────────────────────── */
 .btn {
   padding: 0.5rem 1rem;
   border-radius: 6px;
@@ -163,7 +160,7 @@ body {
   margin-bottom: 0.5rem;
 }
 
-/* Tabs */
+/* ── Tabs ────────────────────────────────────────── */
 .tabs {
   display: flex;
   gap: 1rem;
@@ -185,12 +182,7 @@ body {
   border-bottom-color: var(--primary);
 }
 
-/* Sheet & Labels */
-:root {
-  --a4-width: 210mm;
-  --a4-height: 297mm;
-}
-
+/* ── Sheet A4 ────────────────────────────────────── */
 .sheet {
   width: var(--a4-width);
   min-height: var(--a4-height);
@@ -202,6 +194,10 @@ body {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+}
+
+.sheet-body {
+  flex: 1;
 }
 
 .section-block {
@@ -222,49 +218,171 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 3mm;
+  /* IMPORTANT : overflow visible pour que les marques de découpe dépassent */
+  overflow: visible;
 }
 
-.label {
+/* ── Étiquette ───────────────────────────────────── */
+/*
+  Architecture : .label-wrapper contient .label-inner
+  Les marques de découpe sont sur .label-wrapper via ::before / ::after
+  .label-inner porte le style visuel (fond, bordure, texte)
+*/
+.label-wrapper {
   position: relative;
+  display: inline-flex;
+  /* Pas de overflow: hidden ici — les marques doivent dépasser */
+}
+
+.label-inner {
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  overflow: hidden;
   padding: 1mm;
-  line-height: 1;
-  word-break: break-all;
+  line-height: 1.1;
+  word-break: break-word;
+  overflow: hidden; /* overflow: hidden uniquement sur l'étiquette elle-même */
 }
 
-/* Professional Cutting Marks */
-.label.cutting-marks {
-  /* The marks are drawn outside using pseudo-elements */
-}
-
-.label.cutting-marks::before,
-.label.cutting-marks::after {
+/* ── Marques de découpe ──────────────────────────── */
+/*
+  Technique : 4 petites lignes aux coins (↖ ↗ ↙ ↘)
+  Dessinées avec box-shadow ou avec des pseudo-éléments positionnés
+  On utilise la technique des "corner marks" avec clip-path
+*/
+.cutting-marks::before,
+.cutting-marks::after {
   content: '';
   position: absolute;
   pointer-events: none;
-  border-color: #000;
+  /* On dessine des lignes qui DÉPASSENT de 3mm de chaque côté */
 }
 
-/* Marks are 4mm long and start 1mm outside the label */
-.label.cutting-marks::before {
-  top: -1mm; bottom: -1mm;
-  left: -4mm; right: -4mm;
-  border-top: 0.1mm solid rgba(0,0,0,0.2);
-  border-bottom: 0.1mm solid rgba(0,0,0,0.2);
+/* Traits horizontaux aux 4 coins */
+.cutting-marks::before {
+  /* Ligne horizontale en haut-gauche et haut-droite */
+  height: 0;
+  width: 3mm;
+  border-top: 0.3mm solid #000;
+  /* Positionnement : on crée 4 coins avec box-shadow */
+  top: -2mm;
+  left: 0;
+  /* box-shadow pour dupliquer le trait aux 3 autres coins */
+  box-shadow:
+    /* haut-droit */
+    calc(100% - 3mm) 0 0 0 transparent,
+    /* bas-gauche : décalage vertical vers le bas */
+    0 calc(100% + 4mm) 0 0 transparent,
+    /* bas-droit */
+    calc(100% - 3mm) calc(100% + 4mm) 0 0 transparent;
 }
 
-.label.cutting-marks::after {
-  top: -4mm; bottom: -4mm;
-  left: -1mm; right: -1mm;
-  border-left: 0.1mm solid rgba(0,0,0,0.2);
-  border-right: 0.1mm solid rgba(0,0,0,0.2);
+.cutting-marks::after {
+  /* Ligne verticale en haut-gauche et bas-gauche */
+  width: 0;
+  height: 3mm;
+  border-left: 0.3mm solid #000;
+  top: 0;
+  left: -2mm;
+  box-shadow:
+    /* haut-droit */
+    calc(100% + 4mm) 0 0 0 transparent,
+    /* bas-gauche */
+    0 calc(100% - 3mm) 0 0 transparent,
+    /* bas-droit */
+    calc(100% + 4mm) calc(100% - 3mm) 0 0 transparent;
 }
 
-/* Modals */
+/*
+  CORRECTION FINALE des marques de découpe :
+  On utilise une approche différente et plus fiable :
+  4 pseudo-éléments via les propriétés CSS modernes.
+  
+  Comme CSS ne permet que ::before et ::after, on utilise
+  une combinaison de border partiel avec clip pour faire les 4 coins.
+  
+  Solution retenue : outline en pointillés légers + coins solides
+  via box-shadow multi-valeur sur le wrapper.
+*/
+
+/* Reset des pseudo-éléments précédents */
+.cutting-marks::before,
+.cutting-marks::after {
+  content: none;
+}
+
+/* 
+  Nouvelle approche : on ajoute les marques de découpe 
+  directement sur .label-wrapper via outline et un box-shadow
+  qui simule les 4 coins de coupe.
+  
+  Chaque "coin" est un micro-L de 4mm x 4mm positionné
+  2mm en dehors des bords de l'étiquette.
+*/
+
+/* 
+  On réutilise ::before pour les traits HORIZONTAUX des coins
+  et ::after pour les traits VERTICAUX.
+  
+  Astuce : on utilise background-image: linear-gradient
+  pour dessiner des traits discrets aux 4 coins.
+*/
+.cutting-marks::before {
+  content: '';
+  position: absolute;
+  top: -4mm;
+  left: -4mm;
+  right: -4mm;
+  bottom: -4mm;
+  pointer-events: none;
+  /* 
+    On dessine 8 petits segments aux coins avec background-image.
+    Chaque segment fait 4mm de long et 0.4mm d'épaisseur.
+    Position : coin haut-gauche, haut-droit, bas-gauche, bas-droit.
+  */
+  background-image:
+    /* Coin haut-gauche — horizontal */
+    linear-gradient(to right, #000 4mm, transparent 4mm),
+    /* Coin haut-gauche — vertical */
+    linear-gradient(to bottom, #000 4mm, transparent 4mm),
+    /* Coin haut-droit — horizontal */
+    linear-gradient(to left, #000 4mm, transparent 4mm),
+    /* Coin haut-droit — vertical */
+    linear-gradient(to bottom, #000 4mm, transparent 4mm),
+    /* Coin bas-gauche — horizontal */
+    linear-gradient(to right, #000 4mm, transparent 4mm),
+    /* Coin bas-gauche — vertical */
+    linear-gradient(to top, #000 4mm, transparent 4mm),
+    /* Coin bas-droit — horizontal */
+    linear-gradient(to left, #000 4mm, transparent 4mm),
+    /* Coin bas-droit — vertical */
+    linear-gradient(to top, #000 4mm, transparent 4mm);
+
+  background-size:
+    /* H haut-gauche  */ 4mm 0.4mm,
+    /* V haut-gauche  */ 0.4mm 4mm,
+    /* H haut-droit   */ 4mm 0.4mm,
+    /* V haut-droit   */ 0.4mm 4mm,
+    /* H bas-gauche   */ 4mm 0.4mm,
+    /* V bas-gauche   */ 0.4mm 4mm,
+    /* H bas-droit    */ 4mm 0.4mm,
+    /* V bas-droit    */ 0.4mm 4mm;
+
+  background-position:
+    /* H haut-gauche  */ 0 0,
+    /* V haut-gauche  */ 0 0,
+    /* H haut-droit   */ 100% 0,
+    /* V haut-droit   */ 100% 0,
+    /* H bas-gauche   */ 0 100%,
+    /* V bas-gauche   */ 0 100%,
+    /* H bas-droit    */ 100% 100%,
+    /* V bas-droit    */ 100% 100%;
+
+  background-repeat: no-repeat;
+}
+
+/* ── Modals ──────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -297,49 +415,104 @@ body {
   padding: 1.25rem;
 }
 
+/* ── IMPRESSION (@media print) ───────────────────── */
 @media print {
-  @page { 
-    size: A4; 
-    margin: 0; 
+  @page {
+    size: A4 portrait;
+    margin: 0mm;
   }
-  
-  body { 
-    background: white !important; 
+
+  /* Réinitialiser tout le layout pour l'impression */
+  html, body {
+    width: 210mm;
+    height: 297mm;
+    background: white !important;
     overflow: visible !important;
   }
-  
-  .no-print { display: none !important; }
-  
-  .canvas { 
-    padding: 0 !important; 
-    background: white !important; 
-    overflow: visible !important; 
-    display: block !important;
-    width: 210mm !important;
-  }
-  
-  .sheet { 
-    box-shadow: none !important; 
-    margin: 0 !important; 
-    width: 210mm !important;
-    height: 297mm !important;
-    page-break-after: always !important;
-    page-break-inside: avoid !important;
-    overflow: hidden !important;
-    border: none !important;
-    display: flex !important;
-    padding: 15mm !important;
-    box-sizing: border-box !important;
+
+  /* Masquer tout ce qui n'est pas imprimable */
+  .no-print {
+    display: none !important;
   }
 
-  .label.cutting-marks::before,
-  .label.cutting-marks::after {
-    border-color: #000 !important;
+  /* Le conteneur principal doit être transparent et fluide */
+  .app-container {
+    display: block !important;
+    height: auto !important;
+    width: 210mm !important;
+  }
+
+  main {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .editor-layout {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  /* La zone des feuilles A4 */
+  .canvas {
+    display: block !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    width: 210mm !important;
+  }
+
+  /* ─── Règle critique pour l'impression multi-pages ───
+    
+    IMPORTANT : On N'utilise PAS page-break-inside: avoid sur .sheet
+    car cela empêche le navigateur de couper, résultant en une seule page.
+    
+    On fixe chaque .sheet à exactement 297mm et on force un saut APRÈS.
+    Le contenu qui dépasse est caché par overflow: hidden.
+  */
+  .sheet {
+    width: 210mm !important;
+    height: 297mm !important;      /* Hauteur FIXE = exactement une page A4 */
+    padding: 15mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: hidden !important;   /* Cache ce qui dépasse (déjà sur la page suivante) */
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+    /* Sauts de page avec les propriétés modernes ET les anciennes (compatibilité) */
+    break-after: page !important;
+    page-break-after: always !important;
+    /* NE PAS mettre break-inside: avoid — c'est lui qui cassait tout */
+  }
+
+  /* La dernière sheet ne doit pas forcer une page vide après elle */
+  .sheet:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  /* Section titles visibles à l'impression */
+  .section-title-print {
     -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Les étiquettes : forcer les couleurs à s'imprimer */
+  .label-inner {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Labels grid en impression */
+  .labels-grid {
+    overflow: visible !important;
+  }
+
+  /* Marques de découpe : forcer le noir à l'impression */
+  .cutting-marks::before {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
-
-
-
-
-
