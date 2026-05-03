@@ -14,26 +14,39 @@ const PORT = process.env.PORT || 5001;
 // Empêcher Render de s'endormir (Ping toutes les 14 min)
 const SELF_URL = process.env.SELF_URL;
 if (SELF_URL) {
+  console.log(`\x1b[36m[System] Self-ping active for: ${SELF_URL}\x1b[0m`);
   setInterval(async () => {
     try {
       await fetch(`${SELF_URL}/health`);
-      console.log('Self-ping success: Staying awake!');
+      console.log('\x1b[90m[System] Self-ping success: Staying awake!\x1b[0m');
     } catch (e) {
-      console.error('Self-ping error:', e.message);
+      console.error('\x1b[31m[System] Self-ping error:\x1b[0m', e.message);
     }
-  }, 14 * 60 * 1000);
+  }, 10 * 60 * 1000);
 }
 
 app.use(cors());
 app.use(express.json());
 
-// Logger Middleware Pro
+// Logger Middleware Pro (Explicite)
 app.use((req, res, next) => {
   const start = Date.now();
+  const userId = req.headers['x-user-id'] || 'anonymous';
+  
   res.on('finish', () => {
     const duration = Date.now() - start;
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+    const status = res.statusCode;
+    
+    let color = '\x1b[32m'; // Vert (Success)
+    if (status >= 400) color = '\x1b[33m'; // Jaune (Client Error)
+    if (status >= 500) color = '\x1b[31m'; // Rouge (Server Error)
+
+    console.log(`${color}[${new Date().toLocaleTimeString()}] ${req.method} ${req.url} - ${status} (${duration}ms) - User: ${userId}\x1b[0m`);
+    
+    if (['POST', 'PATCH', 'PUT'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
+      // Masquer les données sensibles si nécessaire, ici on affiche tout pour le debug
+      console.log(`  \x1b[90mBody: ${JSON.stringify(req.body, null, 2).replace(/\n/g, '\n  ')}\x1b[0m`);
+    }
   });
   next();
 });

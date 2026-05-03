@@ -27,7 +27,6 @@ model Project {
 model Section {
   id            String   @id @default(uuid())
   projectId     String
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name          String
   order         Int      @default(0)
   defaultWidth  Float    @default(20)
@@ -38,19 +37,20 @@ model Section {
   borderColor   String   @default("#000000")
   borderRadius  Float    @default(1)
   spacing       Float    @default(3)
-  fontSize      Float    @default(8)     // in pt
+  fontSize      Float    @default(8)
   fontFamily    String   @default("sans-serif")
-  labels        Label[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  labels        Label[]
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model Label {
   id        String   @id @default(uuid())
   sectionId String
-  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   text      String
   order     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 }
