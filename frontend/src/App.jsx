@@ -180,16 +180,17 @@ function App() {
     if (!activeProject?.sections) return [];
     const pages = [];
     let currentPage = { sections: [] };
-    const PAGE_WIDTH = 180, PAGE_HEIGHT = 230;
+    const PAGE_WIDTH = 180, PAGE_HEIGHT = 260; // Increased available height
+    const GAP = 3; // Matches CSS gap
     let currentY = 0;
 
     activeProject.sections.forEach(section => {
       const labels = section.labels || [];
       if (labels.length === 0) return;
 
-      const labelW = section.defaultWidth + 3, labelH = section.defaultHeight + 3;
+      const labelW = section.defaultWidth + GAP, labelH = section.defaultHeight + GAP;
       const labelsPerRow = Math.floor(PAGE_WIDTH / labelW);
-      const sectionHeaderHeight = 10;
+      const sectionHeaderHeight = 8;
       
       if (currentY + sectionHeaderHeight + labelH > PAGE_HEIGHT) {
         pages.push(currentPage); currentPage = { sections: [] }; currentY = 0;

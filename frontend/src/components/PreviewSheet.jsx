@@ -16,28 +16,32 @@ const PreviewSheet = ({ pages, project, logoBase64, showCuttingMarks }) => (
           )}
         </header>
 
-        <div style={{display: 'flex', flexWrap: 'wrap', gap: '3mm', alignContent: 'flex-start'}}>
+        <div className="sheet-body">
           {page.sections.map(sec => (
-            <React.Fragment key={sec.id}>
-              {sec.labels.map(l => (
-                <div 
-                  key={l.id} 
-                  className={`label ${showCuttingMarks ? 'cutting-marks' : ''}`}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflow: 'hidden', padding: '1mm', lineHeight: 1.1, wordBreak: 'break-all',
-                    width: `${sec.defaultWidth}mm`, height: `${sec.defaultHeight}mm`,
-                    backgroundColor: sec.bgColor, color: sec.textColor,
-                    border: `${sec.borderSize}mm solid ${sec.borderColor}`,
-                    borderRadius: `${sec.borderRadius}mm`,
-                    fontSize: `${sec.fontSize}pt`, fontFamily: sec.fontFamily
-                  }}
-                >
-                  {l.text}
-                </div>
-              ))}
-            </React.Fragment>
+            <div key={sec.id} className="section-block">
+              <div className="section-title-print no-print">{sec.name}</div>
+              <div className="labels-grid">
+                {sec.labels.map(l => (
+                  <div 
+                    key={l.id} 
+                    className={`label ${showCuttingMarks ? 'cutting-marks' : ''}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflow: 'hidden', padding: '1mm', lineHeight: 1.1, wordBreak: 'break-all',
+                      width: `${sec.defaultWidth}mm`, height: `${sec.defaultHeight}mm`,
+                      backgroundColor: sec.bgColor, color: sec.textColor,
+                      border: `${sec.borderSize}mm solid ${sec.borderColor}`,
+                      borderRadius: `${sec.borderRadius}mm`,
+                      fontSize: `${sec.fontSize}pt`, fontFamily: sec.fontFamily
+                    }}
+                  >
+                    {l.text}
+                  </div>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
+
       </div>
     ))}
   </section>
