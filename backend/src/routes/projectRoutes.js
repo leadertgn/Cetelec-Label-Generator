@@ -66,11 +66,23 @@ router.post('/', async (req, res) => {
 
 // Modifier un projet
 router.patch('/:id', async (req, res) => {
-  const { name } = req.body;
+  const { 
+    name, marginTop, marginBottom, marginLeft, marginRight, 
+    headerHeight, footerHeight, showSectionTitles 
+  } = req.body;
   try {
     const project = await prisma.project.update({
       where: { id: req.params.id },
-      data: { name }
+      data: { 
+        name,
+        marginTop: marginTop !== undefined ? parseFloat(marginTop) : undefined,
+        marginBottom: marginBottom !== undefined ? parseFloat(marginBottom) : undefined,
+        marginLeft: marginLeft !== undefined ? parseFloat(marginLeft) : undefined,
+        marginRight: marginRight !== undefined ? parseFloat(marginRight) : undefined,
+        headerHeight: headerHeight !== undefined ? parseFloat(headerHeight) : undefined,
+        footerHeight: footerHeight !== undefined ? parseFloat(footerHeight) : undefined,
+        showSectionTitles
+      }
     });
     res.json(project);
   } catch (error) {

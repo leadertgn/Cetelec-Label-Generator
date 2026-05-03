@@ -19,10 +19,10 @@ function App() {
   });
 
   const {
-    projects, activeProject, isLoading,
+    projects, activeProject, setActiveProject, isLoading,
     fetchProjects, loadProject, createProject, renameProject, deleteProject,
     createSection, updateSection, deleteSection, duplicateSection,
-    addLabel, deleteLabel, updateLabel, batchGenerate
+    addLabel, deleteLabel, updateLabel, batchGenerate, persistProject
   } = useProject(deviceId);
 
   const [view, setView] = useState('dashboard');
@@ -52,11 +52,28 @@ function App() {
     }
   }, [projects, activeProject]);
 
+  // Sauvegarde automatique du brouillon local
+  useEffect(() => {
+    if (activeProject) {
+      localStorage.setItem(`cetelec_draft_${activeProject.id}`, JSON.stringify(activeProject));
+    }
+  }, [activeProject]);
+
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
   const handleLoadProject = async (id) => {
     const data = await loadProject(id);
     if (data) {
+      // Vérifier si un brouillon local existe pour ce projet
+      const savedDraft = localStorage.getItem(`cetelec_draft_${id}`);
+      if (savedDraft) {
+        const draft = JSON.parse(savedDraft);
+        // On ne restaure que si le brouillon est plus récent ou différent (simplifié ici par un confirm)
+        if (confirm("Une version non sauvegardée de ce projet a été trouvée. Voulez-vous la restaurer ?")) {
+          setActiveProject(draft);
+        }
+      }
+      
       if (data.sections?.length > 0) setSelectedSectionId(data.sections[0].id);
       setView('editor');
       // Update URL
@@ -125,25 +142,26 @@ function App() {
     }
   };
 
-  // ─── Pagination (calcul en mm) ──────────────────────────────────────────────
-  /*
-   * Dimensions A4 avec marges de 15mm :
-   *   Largeur utile  = 210 - 15 - 15 = 180mm
-   *   Hauteur totale = 297mm
-   *   Marges         = 15mm × 2     = 30mm
-   *   En-tête        ≈ 23mm (h2 + sous-titre + bordure + padding)
-   *   Hauteur utile  = 297 - 30 - 23 = 244mm
-   *
-   * On utilise 240mm comme hauteur utile (marge de sécurité de 4mm)
-   * pour éviter que la dernière ligne d'étiquettes soit coupée.
-   */
-  const PAGE_WIDTH_MM  = 180;  // largeur utile en mm
-  const PAGE_HEIGHT_MM = 240;  // hauteur utile en mm (conservatrice)
-  const GAP_MM         = 3;    // gap entre étiquettes (doit correspondre au CSS gap: 3mm)
-  const SECTION_HEADER_MM = 8; // hauteur du titre de section (~8pt + bordure + margin)
-
   const pages = useMemo(() => {
     if (!activeProject?.sections) return [];
+
+    const {
+      marginTop = 15, marginBottom = 10, marginLeft = 15, marginRight = 15,
+      headerHeight = 20, footerHeight = 10
+    } = activeProject;
+
+    // Fallbacks sécurisés pendant la saisie (évite le NaN)
+    const mT = parseFloat(marginTop) || 0;
+    const mB = parseFloat(marginBottom) || 0;
+    const mL = parseFloat(marginLeft) || 0;
+    const mR = parseFloat(marginRight) || 0;
+    const hH = parseFloat(headerHeight) || 0;
+    const fH = parseFloat(footerHeight) || 0;
+
+    const PAGE_WIDTH_MM  = Math.max(10, 210 - mL - mR);
+    const PAGE_HEIGHT_MM = Math.max(10, 297 - mT - mB - hH - fH);
+    const GAP_MM         = 3;
+    const SECTION_HEADER_MM = 8;
 
     const pagesArr = [];
 
@@ -155,10 +173,14 @@ function App() {
 
     activeProject.sections.forEach(section => {
       const labels = section.labels || [];
-      if (labels.length === 0) return; // section vide → on l'ignore
+      if (labels.length === 0) return;
 
-      const labelW = section.defaultWidth + GAP_MM;
-      const labelH = section.defaultHeight + GAP_MM;
+      // Utiliser des valeurs par défaut si les saisies sont invalides (ex: pendant la frappe)
+      const defW = parseFloat(section.defaultWidth) || 20;
+      const defH = parseFloat(section.defaultHeight) || 15;
+
+      const labelW = defW + GAP_MM;
+      const labelH = defH + GAP_MM;
 
       // Combien d'étiquettes rentrent par ligne ?
       const labelsPerRow = Math.max(1, Math.floor(PAGE_WIDTH_MM / labelW));
@@ -262,7 +284,22 @@ function App() {
               onDeleteLabel={async (id) => {
                 if (await deleteLabel(id)) await loadProject(activeProject.id);
               }}
-              onUpdateSection={updateSection}
+              // Modifications locales sans appel API immédiat
+              onUpdateSection={(id, updates) => {
+                setActiveProject(prev => ({
+                  ...prev,
+                  sections: prev.sections.map(s => s.id === id ? { ...s, ...updates } : s)
+                }));
+              }}
+              onUpdateProjectConfig={(updates) => {
+                setActiveProject(prev => ({ ...prev, ...updates }));
+              }}
+              onSave={async () => {
+                if (await persistProject(activeProject)) {
+                  localStorage.removeItem(`cetelec_draft_${activeProject.id}`);
+                  alert("Projet sauvegardé avec succès !");
+                }
+              }}
               onDuplicateSection={async (id) => {
                 if (await duplicateSection(id)) await loadProject(activeProject.id);
               }}

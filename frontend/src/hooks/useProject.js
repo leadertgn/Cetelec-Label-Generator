@@ -134,10 +134,62 @@ export const useProject = (deviceId) => {
     return false;
   };
 
+  const persistProject = async (projectData) => {
+    setIsLoading(true);
+    try {
+      // 1. Sauvegarder les paramètres du projet
+      const projRes = await apiFetch(`/api/projects/${projectData.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: projectData.name,
+          marginTop: projectData.marginTop,
+          marginBottom: projectData.marginBottom,
+          marginLeft: projectData.marginLeft,
+          marginRight: projectData.marginRight,
+          headerHeight: projectData.headerHeight,
+          footerHeight: projectData.footerHeight,
+          showSectionTitles: projectData.showSectionTitles
+        })
+      }, deviceId);
+
+      // 2. Sauvegarder chaque section modifiée
+      if (projectData.sections) {
+        for (const s of projectData.sections) {
+          await apiFetch(`/api/sections/${s.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              name: s.name,
+              defaultWidth: s.defaultWidth,
+              defaultHeight: s.defaultHeight,
+              bgColor: s.bgColor,
+              textColor: s.textColor,
+              borderSize: s.borderSize,
+              borderColor: s.borderColor,
+              borderRadius: s.borderRadius,
+              spacing: s.spacing,
+              fontSize: s.fontSize,
+              fontFamily: s.fontFamily,
+              order: s.order
+            })
+          }, deviceId);
+        }
+      }
+      
+      // Recharger pour être sûr d'avoir les données à jour
+      await loadProject(projectData.id);
+      return true;
+    } catch (err) { 
+      console.error(err); 
+      return false;
+    } finally { 
+      setIsLoading(false); 
+    }
+  };
+
   return {
-    projects, activeProject, isLoading,
+    projects, activeProject, setActiveProject, isLoading,
     fetchProjects, loadProject, createProject, renameProject, deleteProject,
     createSection, updateSection, deleteSection, duplicateSection,
-    addLabel, deleteLabel, updateLabel, batchGenerate
+    addLabel, deleteLabel, updateLabel, batchGenerate, persistProject
   };
 };

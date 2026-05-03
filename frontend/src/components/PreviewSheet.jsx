@@ -3,7 +3,12 @@ import React from 'react';
 const PreviewSheet = ({ pages, project, logoBase64 }) => (
   <section className="canvas">
     {pages.map((page, pIdx) => (
-      <div key={pIdx} className="sheet">
+      <div key={pIdx} className="sheet" style={{
+        paddingTop: `${project?.marginTop || 15}mm`,
+        paddingBottom: `${project?.marginBottom || 10}mm`,
+        paddingLeft: `${project?.marginLeft || 15}mm`,
+        paddingRight: `${project?.marginRight || 15}mm`,
+      }}>
 
         {/* En-tête de page */}
         <header style={{
@@ -11,9 +16,11 @@ const PreviewSheet = ({ pages, project, logoBase64 }) => (
           justifyContent: 'space-between',
           alignItems: 'center',
           borderBottom: '2px solid #0f172a',
-          paddingBottom: '5mm',
-          marginBottom: '8mm',
-          flexShrink: 0  /* Important : l'en-tête ne rétrécit pas */
+          paddingBottom: '2mm',
+          marginBottom: '5mm',
+          height: `${project?.headerHeight || 20}mm`,
+          boxSizing: 'border-box',
+          flexShrink: 0
         }}>
           <div>
             <h2 style={{ fontSize: '14pt', fontWeight: 800 }}>

@@ -209,9 +209,7 @@ body {
   font-weight: 800;
   color: #1e293b;
   text-transform: uppercase;
-  border-bottom: 1px solid #1e293b;
-  margin-bottom: 3mm;
-  padding-bottom: 1mm;
+  margin-bottom: 2mm;
 }
 
 .labels-grid {

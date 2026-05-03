@@ -19,9 +19,18 @@ model Project {
   logoUrl   String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sections  Section[]
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sections          Section[]
+
+  // Configuration d'impression (en mm)
+  marginTop         Float     @default(15)
+  marginBottom      Float     @default(10)
+  marginLeft        Float     @default(15)
+  marginRight       Float     @default(15)
+  headerHeight      Float     @default(20)
+  footerHeight      Float     @default(10)
+  showSectionTitles Boolean   @default(true)
 }
 
 model Section {
