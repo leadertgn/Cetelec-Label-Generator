@@ -1,407 +1,417 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Plus, Printer, FolderOpen, Tag, Settings, Save, 
-  Trash2, Type, Maximize2, Palette, Image as ImageIcon,
-  ChevronRight, LayoutGrid, Ruler, Edit3, ArrowUp, ArrowDown,
-  ChevronDown, X, Edit
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Header from './components/Header';
+import Dashboard from './components/Dashboard';
+import Sidebar from './components/Sidebar';
+import PreviewSheet from './components/PreviewSheet';
+import Modal from './components/Modal';
+import { useProject } from './hooks/useProject';
 
 function App() {
   const [deviceId] = useState(() => {
     let id = localStorage.getItem('cetelec_device_id');
     if (!id) {
-      id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      id = crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2) + Date.now().toString(36);
       localStorage.setItem('cetelec_device_id', id);
     }
     return id;
   });
 
-  const apiFetch = (url, options = {}) => {
-    return fetch(url, { 
-      ...options, 
-      headers: { ...options.headers, 'X-User-Id': deviceId } 
-    });
-  };
+  const {
+    projects, activeProject, isLoading,
+    fetchProjects, loadProject, createProject, renameProject, deleteProject,
+    createSection, updateSection, deleteSection, duplicateSection,
+    addLabel, deleteLabel, updateLabel, batchGenerate
+  } = useProject(deviceId);
 
-  const [projects, setProjects] = useState([]);
-  const [activeProject, setActiveProject] = useState(null);
-  const [activeTab, setActiveTab] = useState('editor'); // 'editor' | 'config'
+  const [view, setView] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('editor');
   const [selectedSectionId, setSelectedSectionId] = useState(null);
   const [logoBase64, setLogoBase64] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [unit, setUnit] = useState('mm');
+
+  // Modal state
+  const [modalType, setModalType] = useState(null);
+  const [modalData, setModalData] = useState({});
+
+  useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
   useEffect(() => {
-    apiFetchProjects();
-  }, []);
+    document.title = activeProject
+      ? `LabelGen — ${activeProject.name}`
+      : 'CETELEC LabelGen';
+  }, [activeProject]);
 
-  const apiFetchProjects = async () => {
-    setIsLoading(true);
-    try {
-      const res = await apiFetch('/api/projects');
-      if (res.ok) {
-        const data = await res.json();
-        setProjects(data || []);
-      }
-    } catch (err) {
-      console.error("Erreur API projets:", err);
-    } finally {
-      setIsLoading(false);
+  // Sync project ID with URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const idFromUrl = params.get('projectId');
+    if (idFromUrl && projects.length > 0 && !activeProject) {
+      handleLoadProject(idFromUrl);
+    }
+  }, [projects, activeProject]);
+
+  // ─── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleLoadProject = async (id) => {
+    const data = await loadProject(id);
+    if (data) {
+      if (data.sections?.length > 0) setSelectedSectionId(data.sections[0].id);
+      setView('editor');
+      // Update URL
+      const url = new URL(window.location);
+      url.searchParams.set('projectId', id);
+      window.history.pushState({}, '', url);
     }
   };
 
-  const loadProject = async (id) => {
-    if (!id) {
-      setActiveProject(null);
-      return;
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    const name = modalData.name;
+    if (name) {
+      const newProj = await createProject(name);
+      if (newProj) {
+        setModalType(null);
+        handleLoadProject(newProj.id);
+      }
     }
-    try {
-      const res = await apiFetch(`/api/projects/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setActiveProject(data);
-        if (data.sections?.length > 0 && !selectedSectionId) {
-          setSelectedSectionId(data.sections[0].id);
+  };
+
+  const handleRenameProject = async (e) => {
+    e.preventDefault();
+    if (modalData.id && modalData.name) {
+      await renameProject(modalData.id, modalData.name);
+      setModalType(null);
+    }
+  };
+
+  const handleDeleteProject = async (id) => {
+    if (confirm('⚠️ Supprimer définitivement ce projet ?')) {
+      if (await deleteProject(id)) {
+        if (activeProject?.id === id) setView('dashboard');
+      }
+    }
+  };
+
+  const handleCreateSection = async (e) => {
+    e.preventDefault();
+    if (modalData.name && activeProject) {
+      await createSection(activeProject.id, modalData.name);
+      await loadProject(activeProject.id);
+      setModalType(null);
+    }
+  };
+
+  const handleBatchGenerate = async (e) => {
+    e.preventDefault();
+    const { type, text, count, prefix, start, end } = modalData;
+    const body = type === '1'
+      ? { type: 'count', text, count }
+      : { type: 'sequence', prefix, start, end };
+    if (await batchGenerate(selectedSectionId, body)) {
+      await loadProject(activeProject.id);
+      setModalType(null);
+    }
+  };
+
+  const handleUpdateLabel = async (e) => {
+    e.preventDefault();
+    if (modalData.id && modalData.text) {
+      if (await updateLabel(modalData.id, modalData.text)) {
+        await loadProject(activeProject.id);
+        setModalType(null);
+      }
+    }
+  };
+
+  // ─── Pagination (calcul en mm) ──────────────────────────────────────────────
+  /*
+   * Dimensions A4 avec marges de 15mm :
+   *   Largeur utile  = 210 - 15 - 15 = 180mm
+   *   Hauteur totale = 297mm
+   *   Marges         = 15mm × 2     = 30mm
+   *   En-tête        ≈ 23mm (h2 + sous-titre + bordure + padding)
+   *   Hauteur utile  = 297 - 30 - 23 = 244mm
+   *
+   * On utilise 240mm comme hauteur utile (marge de sécurité de 4mm)
+   * pour éviter que la dernière ligne d'étiquettes soit coupée.
+   */
+  const PAGE_WIDTH_MM  = 180;  // largeur utile en mm
+  const PAGE_HEIGHT_MM = 240;  // hauteur utile en mm (conservatrice)
+  const GAP_MM         = 3;    // gap entre étiquettes (doit correspondre au CSS gap: 3mm)
+  const SECTION_HEADER_MM = 8; // hauteur du titre de section (~8pt + bordure + margin)
+
+  const pages = useMemo(() => {
+    if (!activeProject?.sections) return [];
+
+    const pagesArr = [];
+
+    // Crée une nouvelle page vide
+    const newPage = () => ({ sections: [] });
+
+    let currentPage = newPage();
+    let currentY = 0; // curseur vertical en mm sur la page courante
+
+    activeProject.sections.forEach(section => {
+      const labels = section.labels || [];
+      if (labels.length === 0) return; // section vide → on l'ignore
+
+      const labelW = section.defaultWidth + GAP_MM;
+      const labelH = section.defaultHeight + GAP_MM;
+
+      // Combien d'étiquettes rentrent par ligne ?
+      const labelsPerRow = Math.max(1, Math.floor(PAGE_WIDTH_MM / labelW));
+
+      // ── Vérifier si on peut commencer cette section sur la page courante ──
+      // Il faut au moins : header de section + 1 ligne d'étiquettes
+      const minSpaceNeeded = SECTION_HEADER_MM + labelH;
+      if (currentY + minSpaceNeeded > PAGE_HEIGHT_MM) {
+        // Plus assez de place : on finalise la page courante et on en ouvre une nouvelle
+        pagesArr.push(currentPage);
+        currentPage = newPage();
+        currentY = 0;
+      }
+
+      // ── Initialiser le bloc de cette section pour la page courante ──
+      let sectionBlock = { ...section, labels: [] };
+      currentY += SECTION_HEADER_MM;
+
+      // ── Placer les étiquettes une par une ──
+      labels.forEach((label, idx) => {
+        const positionInRow = sectionBlock.labels.length % labelsPerRow;
+        const isStartOfNewRow = positionInRow === 0;
+
+        if (isStartOfNewRow) {
+          // On va commencer une nouvelle ligne : vérifier si elle rentre
+          if (currentY + labelH > PAGE_HEIGHT_MM) {
+            // ── Saut de page ──
+            // Sauvegarder le bloc courant s'il a des étiquettes
+            if (sectionBlock.labels.length > 0) {
+              currentPage.sections.push(sectionBlock);
+            }
+            pagesArr.push(currentPage);
+
+            // Nouvelle page
+            currentPage = newPage();
+            currentY = 0;
+
+            // Le bloc de la section continue sur la nouvelle page
+            // (même nom, mêmes styles, mais nouvelles étiquettes)
+            sectionBlock = { ...section, labels: [] };
+            currentY += SECTION_HEADER_MM; // re-ajouter le header de section
+          }
+          // Avancer le curseur d'une hauteur de ligne
+          currentY += labelH;
         }
-      }
-    } catch (err) {
-      console.error("Erreur chargement projet:", err);
-    }
-  };
 
-  const createProject = async () => {
-    const name = prompt("Nom du nouveau projet :");
-    if (!name) return;
-    try {
-      const res = await apiFetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
+        sectionBlock.labels.push(label);
       });
-      if (res.ok) {
-        const newProj = await res.json();
-        setProjects([newProj, ...projects]);
-        loadProject(newProj.id);
+
+      // ── Finaliser le bloc de la section (dernières étiquettes) ──
+      if (sectionBlock.labels.length > 0) {
+        currentPage.sections.push(sectionBlock);
       }
-    } catch (err) {
-      console.error("Erreur création projet:", err);
+    });
+
+    // ── Finaliser la dernière page ──
+    if (currentPage.sections.length > 0) {
+      pagesArr.push(currentPage);
     }
-  };
 
-  const renameProject = async (id, currentName) => {
-    const newName = prompt("Nouveau nom du projet :", currentName);
-    if (!newName || newName === currentName) return;
-    try {
-      const res = await apiFetch(`/api/projects/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setProjects(projects.map(p => p.id === id ? { ...p, name: newName } : p));
-        if (activeProject?.id === id) {
-          setActiveProject({ ...activeProject, name: newName });
-        }
-      }
-    } catch (err) {
-      console.error("Erreur renommage projet:", err);
-    }
-  };
+    // Si aucune étiquette, retourner une page vide pour afficher le canvas
+    return pagesArr.length > 0 ? pagesArr : [newPage()];
+  }, [activeProject]);
 
-  const createSection = async () => {
-    if (!activeProject) return;
-    const name = prompt("Nom de la catégorie (ex: Disjoncteurs, Fusibles) :");
-    if (!name) return;
-    try {
-      const res = await apiFetch(`/api/projects/${activeProject.id}/sections`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name,
-          defaultWidth: 20,
-          defaultHeight: 15,
-          order: activeProject.sections?.length || 0
-        })
-      });
-      if (res.ok) {
-        loadProject(activeProject.id);
-      }
-    } catch (err) {
-      console.error("Erreur création section:", err);
-    }
-  };
-
-  const deleteSection = async (id) => {
-    if (!confirm("Supprimer cette catégorie et toutes ses étiquettes ?")) return;
-    try {
-      await apiFetch(`/api/sections/${id}`, { method: 'DELETE' });
-      loadProject(activeProject.id);
-    } catch (err) { console.error(err); }
-  };
-
-  const updateSection = async (id, updates) => {
-    try {
-      const res = await apiFetch(`/api/sections/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setActiveProject(prev => ({
-          ...prev,
-          sections: prev.sections.map(s => s.id === id ? { ...s, ...updated } : s)
-        }));
-      }
-    } catch (err) { console.error(err); }
-  };
-
-  const addLabel = async (sectionId, text) => {
-    if (!text) return;
-    try {
-      const res = await apiFetch(`/api/sections/${sectionId}/labels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
-      if (res.ok) {
-        loadProject(activeProject.id);
-      }
-    } catch (err) { console.error(err); }
-  };
-
-  const deleteLabel = async (id) => {
-    try {
-      await apiFetch(`/api/labels/${id}`, { method: 'DELETE' });
-      loadProject(activeProject.id);
-    } catch (err) { console.error(err); }
-  };
-
-  const handleLogoUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setLogoBase64(reader.result);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const activeSection = activeProject?.sections?.find(s => s.id === selectedSectionId);
+  // ─── Rendu ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="app">
-      <header className="header no-print">
-        <div className="logo-text">CETELEC <span style={{color: '#94a3b8', fontWeight: 400}}>LabelGen</span></div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {activeProject && (
-            <button className="btn btn-ghost" onClick={() => renameProject(activeProject.id, activeProject.name)}>
-              <Edit size={16} /> Renommer
-            </button>
-          )}
-          <button className="btn btn-primary" onClick={() => window.print()}>
-            <Printer size={18} /> Imprimer A4
-          </button>
-        </div>
-      </header>
+    <div className="app-container">
+      <Header onHome={() => {
+        setView('dashboard');
+        const url = new URL(window.location);
+        url.searchParams.delete('projectId');
+        window.history.pushState({}, '', url);
+      }} project={activeProject} view={view} />
 
-      <main className="main">
-        <aside className="sidebar no-print">
-          <div className="sidebar-section">
-            <div className="sidebar-title">
-              Projets
-              <button onClick={createProject} className="btn-ghost" style={{padding: '4px'}}><Plus size={16}/></button>
-            </div>
-            {isLoading ? <p>Chargement...</p> : (
-              <select 
-                className="input-field" 
-                value={activeProject?.id || ''} 
-                onChange={(e) => loadProject(e.target.value)}
-                style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}
-              >
-                <option value="">Sélectionner un projet</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            )}
+      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {view === 'dashboard' ? (
+          <Dashboard
+            projects={projects}
+            onCreate={() => { setModalType('createProject'); setModalData({ name: '' }); }}
+            onLoad={handleLoadProject}
+            onDelete={handleDeleteProject}
+            onRename={(id, name) => { setModalType('renameProject'); setModalData({ id, name }); }}
+          />
+        ) : (
+          <div className="editor-layout">
+            <Sidebar
+              activeTab={activeTab} setActiveTab={setActiveTab}
+              project={activeProject}
+              activeSection={activeProject.sections.find(s => s.id === selectedSectionId)}
+              selectedSectionId={selectedSectionId}
+              setSelectedSectionId={setSelectedSectionId}
+              onAddLabel={async (sectionId, text) => {
+                if (await addLabel(sectionId, text)) await loadProject(activeProject.id);
+              }}
+              onBatch={() => {
+                setModalType('batch');
+                setModalData({ type: '1', text: '', count: 10, prefix: 'F', start: 1, end: 10 });
+              }}
+              onUpdateLabel={(id, text) => { setModalType('editLabel'); setModalData({ id, text }); }}
+              onDeleteLabel={async (id) => {
+                if (await deleteLabel(id)) await loadProject(activeProject.id);
+              }}
+              onUpdateSection={updateSection}
+              onDuplicateSection={async (id) => {
+                if (await duplicateSection(id)) await loadProject(activeProject.id);
+              }}
+              onDeleteSection={async (id) => {
+                if (confirm('Supprimer cette catégorie et toutes ses étiquettes ?')) {
+                  if (await deleteSection(id)) await loadProject(activeProject.id);
+                }
+              }}
+              onCreateSection={() => { setModalType('createSection'); setModalData({ name: '' }); }}
+              unit={unit} setUnit={setUnit}
+              onLogoUpload={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => setLogoBase64(reader.result);
+                  reader.readAsDataURL(file);
+                }
+              }}
+            />
+
+            <PreviewSheet
+              pages={pages}
+              project={activeProject}
+              logoBase64={logoBase64}
+            />
           </div>
-
-          {activeProject && (
-            <>
-              <div className="tabs">
-                <div className={`tab ${activeTab === 'editor' ? 'active' : ''}`} onClick={() => setActiveTab('editor')}>Édition</div>
-                <div className={`tab ${activeTab === 'config' ? 'active' : ''}`} onClick={() => setActiveTab('config')}>Configuration</div>
-              </div>
-
-              {activeTab === 'editor' ? (
-                <div className="tab-content">
-                  <div className="input-field">
-                    <label>Catégorie Active</label>
-                    <select 
-                      value={selectedSectionId || ''} 
-                      onChange={(e) => setSelectedSectionId(e.target.value)}
-                    >
-                      <option value="">-- Choisir une catégorie --</option>
-                      {activeProject.sections?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-
-                  {activeSection && (
-                    <div className="quick-add">
-                      <div className="input-field" style={{ marginBottom: '1rem' }}>
-                        <label>Nouvelle Étiquette</label>
-                        <input 
-                          type="text" 
-                          placeholder="Texte + Entrée" 
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              addLabel(activeSection.id, e.target.value);
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                      </div>
-                      <div className="label-list">
-                        <div className="sidebar-title">Liste en temps réel ({activeSection.name})</div>
-                        {activeSection.labels?.map(l => (
-                          <div key={l.id} className="label-pill">
-                            <span>{l.text}</span>
-                            <button onClick={() => deleteLabel(l.id)} className="btn-ghost" style={{color: '#ef4444', padding: '4px'}}><X size={14}/></button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {!activeSection && (
-                    <button className="btn btn-primary" onClick={createSection} style={{ width: '100%', marginTop: '1rem' }}>
-                      <Plus size={18} /> Créer une catégorie
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="tab-content">
-                  <div className="sidebar-title">Réglages des catégories</div>
-                  {activeProject.sections?.map(s => (
-                    <div key={s.id} className="config-card">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                        <strong style={{fontSize: '0.9rem'}}>{s.name}</strong>
-                        <div style={{display: 'flex', gap: '5px'}}>
-                           <button onClick={() => updateSection(s.id, {order: s.order - 1})} className="btn-ghost" style={{padding: '2px'}}><ArrowUp size={14}/></button>
-                           <button onClick={() => updateSection(s.id, {order: s.order + 1})} className="btn-ghost" style={{padding: '2px'}}><ArrowDown size={14}/></button>
-                           <button onClick={() => deleteSection(s.id)} className="btn-ghost" style={{padding: '2px', color: '#ef4444'}}><Trash2 size={14}/></button>
-                        </div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                         <div className="input-field">
-                            <label>Larg (mm)</label>
-                            <input type="number" step="0.5" value={s.defaultWidth} onChange={(e) => updateSection(s.id, {defaultWidth: e.target.value})} />
-                         </div>
-                         <div className="input-field">
-                            <label>Haut (mm)</label>
-                            <input type="number" step="0.5" value={s.defaultHeight} onChange={(e) => updateSection(s.id, {defaultHeight: e.target.value})} />
-                         </div>
-                         <div className="input-field">
-                            <label>Fond</label>
-                            <input type="color" value={s.bgColor} onChange={(e) => updateSection(s.id, {bgColor: e.target.value})} />
-                         </div>
-                         <div className="input-field">
-                            <label>Texte</label>
-                            <input type="color" value={s.textColor} onChange={(e) => updateSection(s.id, {textColor: e.target.value})} />
-                         </div>
-                         <div className="input-field">
-                            <label>Police (pt)</label>
-                            <input type="number" value={s.fontSize} onChange={(e) => updateSection(s.id, {fontSize: e.target.value})} />
-                         </div>
-                         <div className="input-field" style={{ gridColumn: 'span 2' }}>
-                            <label>Famille de police</label>
-                            <select value={s.fontFamily} onChange={(e) => updateSection(s.id, {fontFamily: e.target.value})}>
-                               <option value="sans-serif">Sans-Serif (Standard)</option>
-                               <option value="monospace">Monospace (Code)</option>
-                               <option value="serif">Serif (Classique)</option>
-                            </select>
-                         </div>
-                         <div className="input-field">
-                            <label>Bordure (mm)</label>
-                            <input type="number" step="0.1" value={s.borderSize} onChange={(e) => updateSection(s.id, {borderSize: e.target.value})} />
-                         </div>
-                         <div className="input-field">
-                            <label>Couleur Bordure</label>
-                            <input type="color" value={s.borderColor} onChange={(e) => updateSection(s.id, {borderColor: e.target.value})} />
-                         </div>
-                      </div>
-                    </div>
-                  ))}
-                  <button className="btn btn-ghost" onClick={createSection} style={{ width: '100%', border: '1px dashed var(--border)' }}>
-                     <Plus size={16}/> Nouvelle catégorie
-                  </button>
-                  
-                  <div className="config-group" style={{marginTop: '2rem'}}>
-                    <div className="sidebar-title">Logo du Projet</div>
-                    <input type="file" accept="image/*" onChange={handleLogoUpload} style={{fontSize: '0.75rem'}} />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </aside>
-
-        <section className="canvas">
-          <div className="sheet">
-            <header className="sheet-header">
-              <div>
-                <h2 style={{fontSize: '14pt', fontWeight: 'bold'}}>{activeProject?.name || "Nouveau Projet"}</h2>
-                <p style={{fontSize: '8pt', color: '#64748b'}}>Plan d'étiquetage Électrique</p>
-              </div>
-              {logoBase64 ? (
-                <img src={logoBase64} alt="Project Logo" className="project-logo" />
-              ) : (
-                <div style={{fontSize: '8pt', color: '#cbd5e1', border: '1px dashed #cbd5e1', padding: '10px'}}>CETELEC SA</div>
-              )}
-            </header>
-
-            <div className="sheet-content">
-              {activeProject?.sections?.map(section => {
-                if (!section.labels || section.labels.length === 0) return null;
-                return (
-                  <div key={section.id} className="sheet-category-group">
-                    <div className="category-label-title no-print">{section.name}</div>
-                    {section.labels.map(label => (
-                      <div 
-                        key={label.id} 
-                        className="label"
-                        style={{
-                          width: `${section.defaultWidth}mm`,
-                          height: `${section.defaultHeight}mm`,
-                          backgroundColor: section.bgColor,
-                          color: section.textColor,
-                          border: `${section.borderSize}mm solid ${section.borderColor}`,
-                          borderRadius: `${section.borderRadius}mm`,
-                          fontSize: `${section.fontSize}pt`,
-                          fontFamily: section.fontFamily
-                        }}
-                      >
-                        {label.text}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-
-            {!activeProject && (
-              <div style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1'}}>
-                <LayoutGrid size={64}/>
-                <p style={{marginTop: '1rem'}}>Sélectionnez un projet pour commencer</p>
-              </div>
-            )}
-            
-            {activeProject && activeProject.sections?.length === 0 && (
-              <div style={{width: '100%', textAlign: 'center', marginTop: '50mm', color: '#cbd5e1'}}>
-                Ajoutez une section pour créer des étiquettes
-              </div>
-            )}
-          </div>
-        </section>
+        )}
       </main>
+
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+
+      <Modal isOpen={modalType === 'createProject'} onClose={() => setModalType(null)} title="Nouveau Projet">
+        <form onSubmit={handleCreateProject}>
+          <input
+            autoFocus className="input-field" placeholder="Nom du projet" required
+            value={modalData.name || ''}
+            onChange={e => setModalData({ ...modalData, name: e.target.value })}
+          />
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Créer</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={modalType === 'renameProject'} onClose={() => setModalType(null)} title="Renommer Projet">
+        <form onSubmit={handleRenameProject}>
+          <input
+            autoFocus className="input-field" placeholder="Nom du projet" required
+            value={modalData.name || ''}
+            onChange={e => setModalData({ ...modalData, name: e.target.value })}
+          />
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Enregistrer</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={modalType === 'createSection'} onClose={() => setModalType(null)} title="Nouvelle Catégorie">
+        <form onSubmit={handleCreateSection}>
+          <input
+            autoFocus className="input-field" placeholder="Nom (ex: Disjoncteurs)" required
+            value={modalData.name || ''}
+            onChange={e => setModalData({ ...modalData, name: e.target.value })}
+          />
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Créer</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={modalType === 'editLabel'} onClose={() => setModalType(null)} title="Modifier Étiquette">
+        <form onSubmit={handleUpdateLabel}>
+          <input
+            autoFocus className="input-field" placeholder="Texte" required
+            value={modalData.text || ''}
+            onChange={e => setModalData({ ...modalData, text: e.target.value })}
+          />
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Enregistrer</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={modalType === 'batch'} onClose={() => setModalType(null)} title="Génération Groupée">
+        <form onSubmit={handleBatchGenerate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '0.5rem' }}>
+              Type de génération
+            </label>
+            <select
+              className="input-field" style={{ marginBottom: 0 }}
+              value={modalData.type}
+              onChange={e => setModalData({ ...modalData, type: e.target.value })}
+            >
+              <option value="1">Multiple — même texte répété X fois</option>
+              <option value="2">Séquence — numérotation automatique</option>
+            </select>
+          </div>
+
+          {modalData.type === '1' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '0.5rem' }}>Texte</label>
+                <input
+                  className="input-field" style={{ marginBottom: 0 }}
+                  value={modalData.text}
+                  onChange={e => setModalData({ ...modalData, text: e.target.value })}
+                  required placeholder="ex: REPARTITEUR"
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '0.5rem' }}>Nombre</label>
+                <input
+                  type="number" min="1" max="500" className="input-field" style={{ marginBottom: 0 }}
+                  value={modalData.count}
+                  onChange={e => setModalData({ ...modalData, count: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '0.5rem' }}>Préfixe</label>
+                <input
+                  className="input-field" style={{ marginBottom: 0 }}
+                  value={modalData.prefix}
+                  onChange={e => setModalData({ ...modalData, prefix: e.target.value })}
+                  placeholder="ex: F"
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '0.5rem' }}>Début</label>
+                <input
+                  type="number" className="input-field" style={{ marginBottom: 0 }}
+                  value={modalData.start}
+                  onChange={e => setModalData({ ...modalData, start: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '0.5rem' }}>Fin</label>
+                <input
+                  type="number" className="input-field" style={{ marginBottom: 0 }}
+                  value={modalData.end}
+                  onChange={e => setModalData({ ...modalData, end: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+            Générer les étiquettes
+          </button>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -1,13 +1,12 @@
 :root {
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
-  --bg-main: #f1f5f9;
+  --bg-main: #f8fafc;
   --bg-sidebar: #ffffff;
   --border: #e2e8f0;
-  --text-main: #1e293b;
+  --text-main: #0f172a;
   --text-muted: #64748b;
-  
-  /* A4 Dimensions */
+  --danger: #ef4444;
   --a4-width: 210mm;
   --a4-height: 297mm;
 }
@@ -22,16 +21,15 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-main);
   color: var(--text-main);
-  overflow: hidden;
 }
 
-.app {
+.app-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
 }
 
-/* Header */
+/* ── Header ──────────────────────────────────────── */
 .header {
   height: 64px;
   background: white;
@@ -50,37 +48,47 @@ body {
   letter-spacing: -0.025em;
 }
 
-/* Tabs */
-.tabs {
+/* ── Dashboard ───────────────────────────────────── */
+.dashboard {
+  padding: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.dashboard-header {
   display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.project-list {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.project-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
 }
 
-.tab {
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-}
+.project-item:last-child { border-bottom: none; }
+.project-item:hover { background: #f8fafc; }
 
-.tab.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-}
-
-/* Main Layout */
-.main {
+/* ── Editor Layout ───────────────────────────────── */
+.editor-layout {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
-/* Sidebar */
 .sidebar {
   width: 360px;
   background: var(--bg-sidebar);
@@ -91,23 +99,6 @@ body {
   padding: 1.5rem;
 }
 
-.sidebar-section {
-  margin-bottom: 2rem;
-}
-
-.sidebar-title {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-/* Canvas Area */
 .canvas {
   flex: 1;
   background: #94a3b8;
@@ -118,66 +109,7 @@ body {
   align-items: center;
 }
 
-/* PDF/A4 View */
-.sheet {
-  width: var(--a4-width);
-  min-height: var(--a4-height);
-  background: white;
-  padding: 15mm;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-  margin-bottom: 40px;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.sheet-header {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 2px solid #334155;
-  padding-bottom: 5mm;
-  margin-bottom: 8mm;
-}
-
-.project-logo {
-  max-height: 15mm;
-  max-width: 45mm;
-  object-fit: contain;
-}
-
-/* Category Groups on Sheet */
-.sheet-category-group {
-  width: 100%;
-  margin-bottom: 6mm;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3mm;
-  align-content: flex-start;
-}
-
-.category-label-title {
-   width: 100%;
-   font-size: 7pt;
-   font-weight: bold;
-   color: #94a3b8;
-   margin-bottom: 1mm;
-   text-transform: uppercase;
-}
-
-.label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  overflow: hidden;
-  padding: 1mm;
-  line-height: 1.1;
-  word-break: break-all;
-}
-
-/* UI Elements */
+/* ── UI Components ───────────────────────────────── */
 .btn {
   padding: 0.5rem 1rem;
   border-radius: 6px;
@@ -200,29 +132,13 @@ body {
 .btn-danger:hover { background: #fecaca; }
 
 .input-field {
-  margin-bottom: 1rem;
-}
-
-.input-field label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin-bottom: 0.375rem;
-}
-
-.input-field input, .input-field select {
   width: 100%;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.875rem;
   outline: none;
-}
-
-.input-field input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  margin-bottom: 1rem;
 }
 
 .config-card {
@@ -242,25 +158,224 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   margin-bottom: 0.5rem;
-  font-size: 0.875rem;
 }
 
-/* Print Overrides */
+/* ── Tabs ────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* ── Sheet A4 ────────────────────────────────────── */
+.sheet {
+  width: var(--a4-width);
+  min-height: var(--a4-height);
+  background: white;
+  padding: 15mm;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  margin-bottom: 40px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.sheet-body {
+  flex: 1;
+}
+
+.section-block {
+  margin-bottom: 5mm;
+}
+
+.section-title-print {
+  font-size: 8pt;
+  font-weight: 800;
+  color: #1e293b;
+  text-transform: uppercase;
+  border-bottom: 1px solid #1e293b;
+  margin-bottom: 3mm;
+  padding-bottom: 1mm;
+}
+
+.labels-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3mm;
+  /* IMPORTANT : overflow visible pour que les marques de découpe dépassent */
+  overflow: visible;
+}
+
+/* ── Étiquette ───────────────────────────────────── */
+/*
+  Architecture : .label-wrapper contient .label-inner
+  Les marques de découpe sont sur .label-wrapper via ::before / ::after
+  .label-inner porte le style visuel (fond, bordure, texte)
+*/
+.label-wrapper {
+  position: relative;
+  display: inline-flex;
+  /* Pas de overflow: hidden ici — les marques doivent dépasser */
+}
+
+.label-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1mm;
+  line-height: 1.1;
+  word-break: break-word;
+  overflow: hidden; /* overflow: hidden uniquement sur l'étiquette elle-même */
+}
+
+/* ── Modals ──────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-body {
+  padding: 1.25rem;
+}
+
+/* ── IMPRESSION (@media print) ───────────────────── */
 @media print {
   @page {
-    size: A4;
-    margin: 0;
+    size: A4 portrait;
+    margin: 0mm;
   }
-  
-  body { background: white; overflow: visible; }
-  .no-print { display: none !important; }
-  .canvas { padding: 0; background: white; overflow: visible; align-items: flex-start; justify-content: flex-start;}
-  .sheet {
-    box-shadow: none;
-    margin: 0;
+
+  /* Réinitialiser tout le layout pour l'impression */
+  html, body {
     width: 210mm;
-    min-height: 297mm;
-    page-break-after: always;
-    border: none;
+    height: 297mm;
+    background: white !important;
+    overflow: visible !important;
+  }
+
+  /* Masquer tout ce qui n'est pas imprimable */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Le conteneur principal doit être transparent et fluide */
+  .app-container {
+    display: block !important;
+    height: auto !important;
+    width: 210mm !important;
+  }
+
+  main {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .editor-layout {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  /* La zone des feuilles A4 */
+  .canvas {
+    display: block !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    width: 210mm !important;
+  }
+
+  /* ─── Règle critique pour l'impression multi-pages ───
+    
+    IMPORTANT : On N'utilise PAS page-break-inside: avoid sur .sheet
+    car cela empêche le navigateur de couper, résultant en une seule page.
+    
+    On fixe chaque .sheet à exactement 297mm et on force un saut APRÈS.
+    Le contenu qui dépasse est caché par overflow: hidden.
+  */
+  .sheet {
+    width: 210mm !important;
+    height: 297mm !important;      /* Hauteur FIXE = exactement une page A4 */
+    padding: 15mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: hidden !important;   /* Cache ce qui dépasse (déjà sur la page suivante) */
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+    /* Sauts de page avec les propriétés modernes ET les anciennes (compatibilité) */
+    break-after: page !important;
+    page-break-after: always !important;
+    /* NE PAS mettre break-inside: avoid — c'est lui qui cassait tout */
+  }
+
+  /* La dernière sheet ne doit pas forcer une page vide après elle */
+  .sheet:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  /* Section titles visibles à l'impression */
+  .section-title-print {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Les étiquettes : forcer les couleurs à s'imprimer */
+  .label-inner {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Labels grid en impression */
+  .labels-grid {
+    overflow: visible !important;
+  }
+
+  /* Marques de découpe : forcer le noir à l'impression */
+  .cutting-marks::before {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
