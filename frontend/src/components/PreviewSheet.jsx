@@ -19,7 +19,7 @@ const PreviewSheet = ({ pages, project, logoBase64, showCuttingMarks }) => (
         <div className="sheet-body">
           {page.sections.map(sec => (
             <div key={sec.id} className="section-block">
-              <div className="section-title-print no-print">{sec.name}</div>
+              <div className="section-title-print">{sec.name}</div>
               <div className="labels-grid">
                 {sec.labels.map(l => (
                   <div 

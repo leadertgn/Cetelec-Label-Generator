@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import Sidebar from './components/Sidebar';
 import PreviewSheet from './components/PreviewSheet';
-import { apiFetch } from './utils/api';
+import Modal from './components/Modal';
+import { useProject } from './hooks/useProject';
 
 function App() {
   const [deviceId] = useState(() => {
@@ -15,185 +16,115 @@ function App() {
     return id;
   });
 
+  const {
+    projects, activeProject, isLoading,
+    fetchProjects, loadProject, createProject, renameProject, deleteProject,
+    createSection, updateSection, deleteSection, duplicateSection,
+    addLabel, deleteLabel, updateLabel, batchGenerate
+  } = useProject(deviceId);
+
   const [view, setView] = useState('dashboard');
-  const [projects, setProjects] = useState([]);
-  const [activeProject, setActiveProject] = useState(null);
   const [activeTab, setActiveTab] = useState('editor');
   const [selectedSectionId, setSelectedSectionId] = useState(null);
   const [logoBase64, setLogoBase64] = useState(null);
   const [showCuttingMarks, setShowCuttingMarks] = useState(false);
   const [unit, setUnit] = useState('mm');
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => { apiFetchProjects(); }, []);
-  useEffect(() => {
-    document.title = activeProject ? `LabelGen - ${activeProject.name}` : "CETELEC LabelGen";
-  }, [activeProject]);
+  // Modal States
+  const [modalType, setModalType] = useState(null); // 'createProject' | 'renameProject' | 'batch' | 'editLabel' | 'createSection'
+  const [modalData, setModalData] = useState({});
 
-  const apiFetchProjects = async () => {
-    setIsLoading(true);
-    try {
-      const res = await apiFetch('/api/projects', {}, deviceId);
-      if (res.ok) setProjects(await res.json());
-    } catch (err) { console.error(err); }
-    finally { setIsLoading(false); }
-  };
+  useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
-  const loadProject = async (id) => {
-    try {
-      const res = await apiFetch(`/api/projects/${id}`, {}, deviceId);
-      if (res.ok) {
-        const data = await res.json();
-        setActiveProject(data);
-        if (data.sections?.length > 0) setSelectedSectionId(data.sections[0].id);
-        setView('editor');
-      }
-    } catch (err) { console.error(err); }
-  };
-
-  const createProject = async () => {
-    const name = prompt("Nom du nouveau projet :");
-    if (!name) return;
-    try {
-      const res = await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ name }) }, deviceId);
-      if (res.ok) {
-        const newProj = await res.json();
-        setProjects([newProj, ...projects]);
-        loadProject(newProj.id);
-      }
-    } catch (err) { console.error(err); }
-  };
-
-  const renameProject = async (id, currentName) => {
-    const newName = prompt("Nouveau nom du projet :", currentName);
-    if (!newName || newName === currentName) return;
-    try {
-      const res = await apiFetch(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ name: newName }) }, deviceId);
-      if (res.ok) {
-        setProjects(projects.map(p => p.id === id ? { ...p, name: newName } : p));
-        if (activeProject?.id === id) setActiveProject({ ...activeProject, name: newName });
-      }
-    } catch (err) { console.error(err); }
-  };
-
-  const deleteProject = async (id) => {
-    if (!confirm("⚠️ Supprimer définitivement ce projet ?")) return;
-    try {
-      const res = await apiFetch(`/api/projects/${id}`, { method: 'DELETE' }, deviceId);
-      if (res.ok) {
-        setProjects(projects.filter(p => p.id !== id));
-        if (activeProject?.id === id) { setView('dashboard'); setActiveProject(null); }
-      }
-    } catch (err) { console.error(err); }
-  };
-
-  const createSection = async () => {
-    const name = prompt("Nom de la catégorie :");
-    if (!name) return;
-    try {
-      const res = await apiFetch(`/api/sections/projects/${activeProject.id}/sections`, {
-        method: 'POST',
-        body: JSON.stringify({ name, defaultWidth: 20, defaultHeight: 15 })
-      }, deviceId);
-      if (res.ok) loadProject(activeProject.id);
-    } catch (err) { console.error(err); }
-  };
-
-  const updateSection = async (id, updates) => {
-    try {
-      const res = await apiFetch(`/api/sections/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }, deviceId);
-      if (res.ok) {
-        const updated = await res.json();
-        setActiveProject(prev => ({
-          ...prev,
-          sections: prev.sections.map(s => s.id === id ? { ...s, ...updated } : s)
-        }));
-      }
-    } catch (err) { console.error(err); }
-  };
-
-  const deleteSection = async (id) => {
-    if (!confirm("Supprimer cette catégorie ?")) return;
-    try {
-      await apiFetch(`/api/sections/${id}`, { method: 'DELETE' }, deviceId);
-      loadProject(activeProject.id);
-    } catch (err) { console.error(err); }
-  };
-
-  const duplicateSection = async (id) => {
-    try {
-      const res = await apiFetch(`/api/sections/${id}/duplicate`, { method: 'POST' }, deviceId);
-      if (res.ok) loadProject(activeProject.id);
-    } catch (err) { console.error(err); }
-  };
-
-  const addLabel = async (sectionId, text) => {
-    try {
-      const res = await apiFetch(`/api/sections/${sectionId}/labels`, { method: 'POST', body: JSON.stringify({ text }) }, deviceId);
-      if (res.ok) loadProject(activeProject.id);
-    } catch (err) { console.error(err); }
-  };
-
-  const deleteLabel = async (id) => {
-    try {
-      await apiFetch(`/api/sections/labels/${id}`, { method: 'DELETE' }, deviceId);
-      loadProject(activeProject.id);
-    } catch (err) { console.error(err); }
-  };
-
-  const updateLabel = async (id, current) => {
-    const text = prompt("Modifier :", current);
-    if (!text) return;
-    try {
-      const res = await apiFetch(`/api/sections/labels/${id}`, { method: 'PATCH', body: JSON.stringify({ text }) }, deviceId);
-      if (res.ok) loadProject(activeProject.id);
-    } catch (err) { console.error(err); }
-  };
-
-  const batchGenerate = async (sectionId) => {
-    const type = prompt("1: Multiple, 2: Séquence", "1");
-    let body = {};
-    if (type === "1") {
-      const text = prompt("Texte :", "D1");
-      const count = prompt("Nombre :", "10");
-      body = { type: 'count', text, count };
-    } else {
-      const prefix = prompt("Préfixe :", "F");
-      const start = prompt("Début :", "1");
-      const end = prompt("Fin :", "10");
-      body = { type: 'sequence', prefix, start, end };
-    }
-    await apiFetch(`/api/sections/${sectionId}/batch`, { method: 'POST', body: JSON.stringify(body) }, deviceId);
-    loadProject(activeProject.id);
-  };
-
-  const handleLogoUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setLogoBase64(reader.result);
-      reader.readAsDataURL(file);
+  // Handlers
+  const handleLoadProject = async (id) => {
+    const data = await loadProject(id);
+    if (data) {
+      if (data.sections?.length > 0) setSelectedSectionId(data.sections[0].id);
+      setView('editor');
     }
   };
 
-  const getPages = () => {
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    const name = modalData.name;
+    if (name) {
+      const newProj = await createProject(name);
+      if (newProj) {
+        setModalType(null);
+        handleLoadProject(newProj.id);
+      }
+    }
+  };
+
+  const handleRenameProject = async (e) => {
+    e.preventDefault();
+    if (modalData.id && modalData.name) {
+      await renameProject(modalData.id, modalData.name);
+      setModalType(null);
+    }
+  };
+
+  const handleDeleteProject = async (id) => {
+    if (confirm("⚠️ Supprimer définitivement ce projet ?")) {
+      if (await deleteProject(id)) {
+        if (activeProject?.id === id) setView('dashboard');
+      }
+    }
+  };
+
+  const handleCreateSection = async (e) => {
+    e.preventDefault();
+    if (modalData.name && activeProject) {
+      await createSection(activeProject.id, modalData.name);
+      await loadProject(activeProject.id);
+      setModalType(null);
+    }
+  };
+
+  const handleBatchGenerate = async (e) => {
+    e.preventDefault();
+    const { type, text, count, prefix, start, end } = modalData;
+    const body = type === '1' ? { type: 'count', text, count } : { type: 'sequence', prefix, start, end };
+    if (await batchGenerate(selectedSectionId, body)) {
+      await loadProject(activeProject.id);
+      setModalType(null);
+    }
+  };
+
+  const handleUpdateLabel = async (e) => {
+    e.preventDefault();
+    if (modalData.id && modalData.text) {
+      if (await updateLabel(modalData.id, modalData.text)) {
+        await loadProject(activeProject.id);
+        setModalType(null);
+      }
+    }
+  };
+
+  const pages = useMemo(() => {
     if (!activeProject?.sections) return [];
-    const pages = [];
+    const pagesArr = [];
     let currentPage = { sections: [] };
-    const PAGE_WIDTH = 180, PAGE_HEIGHT = 260; // Increased available height
-    const GAP = 3; // Matches CSS gap
+    
+    const PAGE_WIDTH = 180; 
+    const PAGE_HEIGHT = 237; 
+    const GAP = 3; 
     let currentY = 0;
 
     activeProject.sections.forEach(section => {
       const labels = section.labels || [];
       if (labels.length === 0) return;
 
-      const labelW = section.defaultWidth + GAP, labelH = section.defaultHeight + GAP;
-      const labelsPerRow = Math.floor(PAGE_WIDTH / labelW);
+      const labelW = section.defaultWidth + GAP;
+      const labelH = section.defaultHeight + GAP;
+      const labelsPerRow = Math.floor(PAGE_WIDTH / labelW) || 1;
       const sectionHeaderHeight = 8;
       
       if (currentY + sectionHeaderHeight + labelH > PAGE_HEIGHT) {
-        pages.push(currentPage); currentPage = { sections: [] }; currentY = 0;
+        pagesArr.push(currentPage); 
+        currentPage = { sections: [] }; 
+        currentY = 0;
       }
 
       let sectionInPage = { ...section, labels: [] };
@@ -203,7 +134,8 @@ function App() {
         const isFirstInRow = sectionInPage.labels.length % labelsPerRow === 0;
         if (isFirstInRow && currentY + labelH > PAGE_HEIGHT) {
           currentPage.sections.push(sectionInPage);
-          pages.push(currentPage); currentPage = { sections: [] };
+          pagesArr.push(currentPage); 
+          currentPage = { sections: [] };
           sectionInPage = { ...section, labels: [label] };
           currentY = sectionHeaderHeight + labelH;
         } else {
@@ -213,9 +145,9 @@ function App() {
       });
       if (sectionInPage.labels.length > 0) currentPage.sections.push(sectionInPage);
     });
-    if (currentPage.sections.length > 0) pages.push(currentPage);
-    return pages.length > 0 ? pages : [{ sections: [] }];
-  };
+    if (currentPage.sections.length > 0) pagesArr.push(currentPage);
+    return pagesArr;
+  }, [activeProject]);
 
   return (
     <div className="app-container">
@@ -225,10 +157,10 @@ function App() {
         {view === 'dashboard' ? (
           <Dashboard 
             projects={projects} 
-            onCreate={createProject} 
-            onLoad={loadProject} 
-            onDelete={deleteProject} 
-            onRename={renameProject}
+            onCreate={() => { setModalType('createProject'); setModalData({ name: '' }); }} 
+            onLoad={handleLoadProject} 
+            onDelete={handleDeleteProject} 
+            onRename={(id, name) => { setModalType('renameProject'); setModalData({ id, name }); }}
           />
         ) : (
           <div className="editor-layout">
@@ -236,12 +168,26 @@ function App() {
               activeTab={activeTab} setActiveTab={setActiveTab}
               project={activeProject} activeSection={activeProject.sections.find(s => s.id === selectedSectionId)}
               selectedSectionId={selectedSectionId} setSelectedSectionId={setSelectedSectionId}
-              onAddLabel={addLabel} onBatch={batchGenerate} onUpdateLabel={updateLabel} onDeleteLabel={deleteLabel}
-              onUpdateSection={updateSection} onDuplicateSection={duplicateSection} onDeleteSection={deleteSection} onCreateSection={createSection}
-              unit={unit} setUnit={setUnit} showCuttingMarks={showCuttingMarks} setShowCuttingMarks={setShowCuttingMarks} onLogoUpload={handleLogoUpload}
+              onAddLabel={addLabel} 
+              onBatch={() => { setModalType('batch'); setModalData({ type: '1', text: '', count: 10, prefix: 'F', start: 1, end: 10 }); }} 
+              onUpdateLabel={(id, text) => { setModalType('editLabel'); setModalData({ id, text }); }} 
+              onDeleteLabel={async (id) => { if (await deleteLabel(id)) await loadProject(activeProject.id); }}
+              onUpdateSection={updateSection} 
+              onDuplicateSection={async (id) => { if (await duplicateSection(id)) await loadProject(activeProject.id); }} 
+              onDeleteSection={async (id) => { if (confirm("Supprimer cette catégorie ?")) { if (await deleteSection(id)) await loadProject(activeProject.id); } }} 
+              onCreateSection={() => { setModalType('createSection'); setModalData({ name: '' }); }}
+              unit={unit} setUnit={setUnit} showCuttingMarks={showCuttingMarks} setShowCuttingMarks={setShowCuttingMarks} 
+              onLogoUpload={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => setLogoBase64(reader.result);
+                  reader.readAsDataURL(file);
+                }
+              }}
             />
             <PreviewSheet 
-              pages={getPages()} 
+              pages={pages} 
               project={activeProject} 
               logoBase64={logoBase64} 
               showCuttingMarks={showCuttingMarks} 
@@ -249,6 +195,72 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Modals */}
+      <Modal isOpen={modalType === 'createProject'} onClose={() => setModalType(null)} title="Nouveau Projet">
+        <form onSubmit={handleCreateProject}>
+          <input 
+            autoFocus className="input-field" placeholder="Nom du projet" required
+            value={modalData.name || ''} onChange={e => setModalData({...modalData, name: e.target.value})}
+          />
+          <button type="submit" className="btn btn-primary w-full">Créer</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={modalType === 'renameProject'} onClose={() => setModalType(null)} title="Renommer Projet">
+        <form onSubmit={handleRenameProject}>
+          <input 
+            autoFocus className="input-field" placeholder="Nom du projet" required
+            value={modalData.name || ''} onChange={e => setModalData({...modalData, name: e.target.value})}
+          />
+          <button type="submit" className="btn btn-primary w-full">Enregistrer</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={modalType === 'createSection'} onClose={() => setModalType(null)} title="Nouvelle Catégorie">
+        <form onSubmit={handleCreateSection}>
+          <input 
+            autoFocus className="input-field" placeholder="Nom (ex: Disjoncteurs)" required
+            value={modalData.name || ''} onChange={e => setModalData({...modalData, name: e.target.value})}
+          />
+          <button type="submit" className="btn btn-primary w-full">Créer</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={modalType === 'editLabel'} onClose={() => setModalType(null)} title="Modifier Étiquette">
+        <form onSubmit={handleUpdateLabel}>
+          <input 
+            autoFocus className="input-field" placeholder="Texte" required
+            value={modalData.text || ''} onChange={e => setModalData({...modalData, text: e.target.value})}
+          />
+          <button type="submit" className="btn btn-primary w-full">Enregistrer</button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={modalType === 'batch'} onClose={() => setModalType(null)} title="Génération Groupée">
+        <form onSubmit={handleBatchGenerate} className="space-y-4">
+          <div>
+            <label className="text-xs font-bold uppercase text-slate-400 mb-1 block">Type</label>
+            <select className="input-field" value={modalData.type} onChange={e => setModalData({...modalData, type: e.target.value})}>
+              <option value="1">Multiple (Même texte)</option>
+              <option value="2">Séquence (Nombres)</option>
+            </select>
+          </div>
+          {modalData.type === '1' ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="text-xs font-bold">Texte</label><input className="input-field" value={modalData.text} onChange={e => setModalData({...modalData, text: e.target.value})} required/></div>
+              <div><label className="text-xs font-bold">Nombre</label><input type="number" className="input-field" value={modalData.count} onChange={e => setModalData({...modalData, count: e.target.value})} required/></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              <div><label className="text-xs font-bold">Préfixe</label><input className="input-field" value={modalData.prefix} onChange={e => setModalData({...modalData, prefix: e.target.value})}/></div>
+              <div><label className="text-xs font-bold">Début</label><input type="number" className="input-field" value={modalData.start} onChange={e => setModalData({...modalData, start: e.target.value})} required/></div>
+              <div><label className="text-xs font-bold">Fin</label><input type="number" className="input-field" value={modalData.end} onChange={e => setModalData({...modalData, end: e.target.value})} required/></div>
+            </div>
+          )}
+          <button type="submit" className="btn btn-primary w-full">Générer</button>
+        </form>
+      </Modal>
     </div>
   );
 }

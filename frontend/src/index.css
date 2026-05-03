@@ -193,26 +193,27 @@ body {
 
 .sheet {
   width: var(--a4-width);
-  min-height: var(--a4-height); /* Min height in UI to allow scrolling */
+  min-height: var(--a4-height);
   background: white;
   padding: 15mm;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
   margin-bottom: 40px;
   position: relative;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .section-block {
-  margin-bottom: 8mm;
+  margin-bottom: 5mm;
 }
 
 .section-title-print {
   font-size: 8pt;
-  font-weight: bold;
-  color: #94a3b8;
+  font-weight: 800;
+  color: #1e293b;
   text-transform: uppercase;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #1e293b;
   margin-bottom: 3mm;
   padding-bottom: 1mm;
 }
@@ -225,11 +226,19 @@ body {
 
 .label {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  padding: 1mm;
+  line-height: 1;
+  word-break: break-all;
 }
 
-/* Subtle Cutting Marks */
+/* Professional Cutting Marks */
 .label.cutting-marks {
-  outline: 0.1mm dashed rgba(0,0,0,0.1);
+  /* The marks are drawn outside using pseudo-elements */
 }
 
 .label.cutting-marks::before,
@@ -237,20 +246,55 @@ body {
   content: '';
   position: absolute;
   pointer-events: none;
+  border-color: #000;
 }
 
+/* Marks are 4mm long and start 1mm outside the label */
 .label.cutting-marks::before {
   top: -1mm; bottom: -1mm;
-  left: -2mm; right: -2mm;
+  left: -4mm; right: -4mm;
+  border-top: 0.1mm solid rgba(0,0,0,0.2);
+  border-bottom: 0.1mm solid rgba(0,0,0,0.2);
+}
+
+.label.cutting-marks::after {
+  top: -4mm; bottom: -4mm;
+  left: -1mm; right: -1mm;
   border-left: 0.1mm solid rgba(0,0,0,0.2);
   border-right: 0.1mm solid rgba(0,0,0,0.2);
 }
 
-.label.cutting-marks::after {
-  top: -2mm; bottom: -2mm;
-  left: -1mm; right: -1mm;
-  border-top: 0.1mm solid rgba(0,0,0,0.2);
-  border-bottom: 0.1mm solid rgba(0,0,0,0.2);
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-body {
+  padding: 1.25rem;
 }
 
 @media print {
@@ -262,7 +306,6 @@ body {
   body { 
     background: white !important; 
     overflow: visible !important;
-    height: auto !important;
   }
   
   .no-print { display: none !important; }
@@ -273,16 +316,16 @@ body {
     overflow: visible !important; 
     display: block !important;
     width: 210mm !important;
-    height: auto !important;
   }
   
   .sheet { 
     box-shadow: none !important; 
     margin: 0 !important; 
     width: 210mm !important;
-    height: 297mm !important; /* Strict height only for print */
+    height: 297mm !important;
     page-break-after: always !important;
     page-break-inside: avoid !important;
+    overflow: hidden !important;
     border: none !important;
     display: flex !important;
     padding: 15mm !important;
@@ -292,8 +335,11 @@ body {
   .label.cutting-marks::before,
   .label.cutting-marks::after {
     border-color: #000 !important;
+    -webkit-print-color-adjust: exact;
   }
 }
+
+
 
 
 

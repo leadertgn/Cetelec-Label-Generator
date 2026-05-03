@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Plus, LayoutGrid, Ruler, Edit3, Save, 
+  Plus, LayoutGrid, Ruler, Edit3, Copy, 
   Trash2, X, Palette, Type, Settings 
 } from 'lucide-react';
 import { mmToCm, cmToMm } from '../utils/api';
@@ -93,7 +93,7 @@ const Sidebar = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
                   <strong style={{fontSize: '0.9rem'}}>{s.name}</strong>
                   <div style={{display: 'flex', gap: '5px'}}>
-                    <button onClick={() => onDuplicateSection(s.id)} className="btn-ghost" style={{padding: '4px'}}><Save size={14}/></button>
+                    <button onClick={() => onDuplicateSection(s.id)} className="btn-ghost" style={{padding: '4px'}}><Copy size={14}/></button>
                     <button onClick={() => onDeleteSection(s.id)} className="btn-ghost" style={{padding: '4px', color: '#ef4444'}}><Trash2 size={14}/></button>
                   </div>
                 </div>
