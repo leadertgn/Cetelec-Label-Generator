@@ -21,7 +21,7 @@ function App() {
 
   const {
     projects, activeProject, setActiveProject, isLoading,
-    fetchProjects, loadProject, createProject, renameProject, deleteProject,
+    fetchProjects, loadProject, createProject, renameProject, deleteProject, duplicateProject,
     createSection, updateSection, deleteSection, duplicateSection,
     addLabel, deleteLabel, updateLabel, batchGenerate, persistProject
   } = useProject(deviceId);
@@ -158,13 +158,14 @@ function App() {
         window.history.pushState({}, '', url);
       }} project={activeProject} view={view} />
 
-      <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <main style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {view === 'dashboard' ? (
           <Dashboard
             projects={projects}
             onCreate={() => { setModalType('createProject'); setModalData({ name: '' }); }}
             onLoad={handleLoadProject}
             onDelete={handleDeleteProject}
+            onDuplicate={duplicateProject}
             onRename={(id, name) => { setModalType('renameProject'); setModalData({ id, name }); }}
           />
         ) : (

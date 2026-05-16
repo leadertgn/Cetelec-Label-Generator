@@ -106,4 +106,64 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Dupliquer un projet
+router.post('/:id/duplicate', async (req, res) => {
+  try {
+    const original = await prisma.project.findUnique({
+      where: { id: req.params.id },
+      include: {
+        sections: {
+          include: { labels: true }
+        }
+      }
+    });
+
+    if (!original) return res.status(404).json({ error: "Projet non trouvé" });
+
+    const duplicatedProject = await prisma.project.create({
+      data: {
+        name: `${original.name} (Copie)`,
+        userId: original.userId,
+        marginTop: original.marginTop,
+        marginBottom: original.marginBottom,
+        marginLeft: original.marginLeft,
+        marginRight: original.marginRight,
+        headerHeight: original.headerHeight,
+        footerHeight: original.footerHeight,
+        showSectionTitles: original.showSectionTitles,
+        sections: {
+          create: original.sections.map(s => ({
+            name: s.name,
+            order: s.order,
+            defaultWidth: s.defaultWidth,
+            defaultHeight: s.defaultHeight,
+            bgColor: s.bgColor,
+            textColor: s.textColor,
+            borderSize: s.borderSize,
+            borderColor: s.borderColor,
+            borderRadius: s.borderRadius,
+            spacing: s.spacing,
+            fontSize: s.fontSize,
+            fontFamily: s.fontFamily,
+            labels: {
+              create: s.labels.map(l => ({
+                text: l.text,
+                order: l.order
+              }))
+            }
+          }))
+        }
+      },
+      include: {
+        _count: { select: { sections: true } }
+      }
+    });
+
+    console.log(`[Project] Duplication : "${duplicatedProject.name}"`);
+    res.json(duplicatedProject);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

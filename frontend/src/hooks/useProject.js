@@ -61,6 +61,17 @@ export const useProject = (deviceId) => {
     return false;
   };
 
+  const duplicateProject = async (id) => {
+    try {
+      const res = await apiFetch(`/api/projects/${id}/duplicate`, { method: 'POST' }, deviceId);
+      if (res.ok) {
+        const newProj = await res.json();
+        setProjects(prev => [newProj, ...prev]);
+        return newProj;
+      }
+    } catch (err) { console.error(err); }
+  };
+
   // Sections
   const createSection = async (projectId, name) => {
     try {
@@ -188,7 +199,7 @@ export const useProject = (deviceId) => {
 
   return {
     projects, activeProject, setActiveProject, isLoading,
-    fetchProjects, loadProject, createProject, renameProject, deleteProject,
+    fetchProjects, loadProject, createProject, renameProject, deleteProject, duplicateProject,
     createSection, updateSection, deleteSection, duplicateSection,
     addLabel, deleteLabel, updateLabel, batchGenerate, persistProject
   };
